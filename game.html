@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Conquest Map</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        html, body { height: 100%; margin: 0; padding: 0; background: #000; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+        #map { height: 100%; width: 100%; }
+        .sidebar { position: absolute; top: 0; left: 0; bottom: 0; width: 250px; background: rgba(20,20,20,0.95); border-right: 2px solid #8B0000; z-index: 200; transform: translateX(-100%); transition: 0.3s; color: white; padding-top: 10px; display:flex; flex-direction:column;}
+        .sidebar.open { transform: translateX(0); }
+        .menu-toggle { position: absolute; top: 10px; left: 10px; z-index: 201; background: #8B0000; color: white; padding: 8px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; border: 2px solid #ff4444; font-family: 'Cinzel', serif; }
+        .sb-header { text-align: center; padding: 10px; border-bottom: 1px solid #444; }
+        .rank-badge { background: linear-gradient(135deg, #FFD700, #B8860B); color: black; padding: 5px; border-radius: 4px; font-weight: bold; display: inline-block; font-family: 'Cinzel', serif; margin-top:5px;}
+        .sb-stats { padding: 20px; text-align: center; }
+        .sb-val { font-size: 1.4rem; color: #00e676; font-weight: bold; }
+        .controls { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 400px; z-index: 100; display: flex; flex-direction: column; gap: 10px; }
+        button { padding: 18px; border: none; border-radius: 12px; font-size: 1.2rem; font-weight: bold; cursor: pointer; font-family: 'Cinzel', serif; text-transform: uppercase; }
+        #startBtn { background: linear-gradient(180deg, #00e676, #00c853); }
+        #stopBtn { background: linear-gradient(180deg, #ff1744, #d50000); color: white; display: none; }
+        .sb-clan { flex: 1; padding: 10px; overflow-y: auto; border-top: 1px solid #444; }
+        .lb-item { display: flex; justify-content: space-between; padding: 5px; border-bottom: 1px solid #333; font-size: 0.85rem; }
+        .logout-btn-sb { padding: 10px; border: 1px solid #ff4444; color: #ff4444; background: none; margin: 10px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div class="menu-toggle" id="menuBtn">☰ STATS</div>
+    <div class="sidebar" id="sidebar">
+        <div class="sb-header"><div id="sbUser">...</div><div id="sbRank" class="rank-badge">Peasant</div></div>
+        <div class="sb-stats">
+            <div style="margin-bottom:15px;"><div class="sb-val" id="sbArea">0 m²</div><div style="color:#aaa; font-size:0.8rem;">TOTAL AREA</div></div>
+            <div><div class="sb-val" id="sbCount">0</div><div style="color:#aaa; font-size:0.8rem;">TERRITORIES</div></div>
+        </div>
+        <div class="sb-clan" id="clanSection" style="display:none;"><div style="color:#C5A059; text-align:center; font-family:'Cinzel', serif;">CLAN RANKING</div><div id="clanLeaderboard"></div></div>
+        <button class="logout-btn-sb" onclick="window.logout()">LOGOUT</button>
+    </div>
+    <div id="map"></div>
+    <div class="controls">
+        <button id="startBtn">⚔️ Start Conquest</button>
+        <button id="stopBtn">🚩 Claim Territory</button>
+        <a href="dashboard.html" style="background:white; text-align:center; padding:10px; border-radius:8px; font-weight:bold; color:black; text-decoration:none; font-family:'Cinzel', serif;">Exit to Command</a>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+        import { getDatabase, ref, push, update, onValue, get, child } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+
+        const firebaseConfig = { databaseURL: "https://runmate-cb328-default-rtdb.firebaseio.com/" };
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        
+        let map, userMarker, activePolyline, watchId, pathCoords = [];
+        const currentUser = localStorage.getItem('currentUser');
+        const userIcon = localStorage.getItem('userIcon') || "👤";
+        let myClan = null;
+
+        if(!currentUser) window.location.href = 'index.html';
+        document.getElementById('sbUser').innerText = `${userIcon} ${currentUser}`;
+        document.getElementById('menuBtn').addEventListener('click', () => document.getElementById('sidebar').classList.toggle('open'));
+
+        window.logout = function() { if(confirm("Logout?")) { localStorage.clear(); window.location.href = 'index.html'; }};
+
+        function calculateRank(area) {
+            if (area >= 100000) return "👑 KING";
+            if (area >= 10000) return "⚔️ WARRIOR";
+            if (area >= 1000) return "🛡️ SOLDIER";
+            if (area >= 100) return "🌾 FARMER";
+            return "🪵 PEASANT";
+        }
+
+        window.initMap = function() {
+            map = new google.maps.Map(document.getElementById("map"), {
+                zoom: 19, center: { lat: 0, lng: 0 }, mapTypeId: 'terrain', disableDefaultUI: true,
+                styles: [{ elementType: "geometry", stylers: [{ color: "#242f3e" }] }, { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] }, { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] }, { featureType: "road", elementType: "geometry", stylers: [{ color: "#38414e" }] }]
+            });
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(pos => {
+                    const latLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                    map.setCenter(latLng); updateUserMarker(latLng);
+                });
+            }
+            loadTerritories(); loadUserData();
+        };
+
+        function updateUserMarker(pos) {
+            if (!userMarker) userMarker = new google.maps.Marker({ position: pos, map: map, label: { text: userIcon, fontSize: "24px", color: "white" }, title: currentUser });
+            else userMarker.setPosition(pos);
+        }
+
+        function loadUserData() {
+            get(child(ref(db), `users/${currentUser}`)).then(snap => { if(snap.val() && snap.val().clan) { myClan = snap.val().clan; document.getElementById('clanSection').style.display = 'block'; }});
+            onValue(ref(db, 'territories'), (snapshot) => {
+                const data = snapshot.val() || {};
+                let myArea = 0, myCount = 0, clanStats = {};
+                Object.values(data).forEach(t => {
+                    if (t.owner === currentUser) { myArea += (t.areaSize||0); myCount++; }
+                    if (myClan) { if (!clanStats[t.owner]) clanStats[t.owner] = 0; clanStats[t.owner] += (t.areaSize||0); }
+                });
+                document.getElementById('sbArea').innerText = Math.round(myArea).toLocaleString() + " m²";
+                document.getElementById('sbCount').innerText = myCount;
+                document.getElementById('sbRank').innerText = calculateRank(myArea);
+                if (myClan) updateClanLeaderboard(clanStats);
+            });
+        }
+
+        async function updateClanLeaderboard(rawStats) {
+            const clanSnap = await get(child(ref(db), `clans/${myClan}/members`));
+            const members = clanSnap.val() || {};
+            let lb = [];
+            Object.keys(members).forEach(uid => lb.push({ name: uid, score: rawStats[uid] || 0 }));
+            lb.sort((a, b) => b.score - a.score);
+            document.getElementById('clanLeaderboard').innerHTML = lb.slice(0, 10).map((p, i) => `<div class="lb-item"><span>#${i+1} ${p.name}</span><span style="color:#aaa;">${Math.round(p.score)}</span></div>`).join('');
+        }
+
+        document.getElementById('startBtn').addEventListener('click', () => {
+            if (!map) return alert("Map loading...");
+            pathCoords = []; activePolyline = new google.maps.Polyline({ path: [], strokeColor: "#FFFF00", strokeWeight: 6, map: map });
+            document.getElementById('startBtn').style.display = 'none'; document.getElementById('stopBtn').style.display = 'block';
+            watchId = navigator.geolocation.watchPosition(pos => {
+                const latLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                pathCoords.push(latLng); activePolyline.getPath().push(new google.maps.LatLng(latLng.lat, latLng.lng));
+                map.panTo(latLng); updateUserMarker(latLng);
+            }, err => console.error(err), { enableHighAccuracy: true });
+        });
+
+        document.getElementById('stopBtn').addEventListener('click', async () => {
+            navigator.geolocation.clearWatch(watchId);
+            document.getElementById('startBtn').style.display = 'block'; document.getElementById('stopBtn').style.display = 'none';
+            if (pathCoords.length < 3) { activePolyline.setMap(null); return alert("Path too short."); }
+            const area = google.maps.geometry.spherical.computeArea(activePolyline.getPath());
+            const newKey = push(ref(db, 'territories')).key;
+            await update(ref(db), { [`territories/${newKey}`]: { owner: currentUser, coords: pathCoords, areaSize: area, timestamp: Date.now() } });
+            alert(`Captured ${Math.round(area)} m²!`); activePolyline.setMap(null);
+        });
+
+        function loadTerritories() {
+            onValue(ref(db, 'territories'), (snapshot) => {
+                const data = snapshot.val();
+                if (data) Object.values(data).forEach(t => { new google.maps.Polygon({ paths: t.coords, fillColor: t.owner === currentUser ? '#00e676' : '#ff1744', fillOpacity: 0.35, strokeWeight: 1, map: map }); });
+            });
+        }
+    </script>
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAzfoxuzRbmyrhGChfTEWB05xvyNRmvK3k&libraries=geometry&callback=initMap"></script>
+</body>
+</html>
