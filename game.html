@@ -8,17 +8,34 @@
     <style>
         html, body { height: 100%; margin: 0; padding: 0; background: #000; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
         #map { height: 100%; width: 100%; }
-        .sidebar { position: absolute; top: 0; left: 0; bottom: 0; width: 250px; background: rgba(20,20,20,0.95); border-right: 2px solid #8B0000; z-index: 200; transform: translateX(-100%); transition: 0.3s; color: white; padding-top: 10px; display:flex; flex-direction:column;}
+        
+        .sidebar { position: absolute; top: 0; left: 0; bottom: 0; width: 250px; background: rgba(20,20,20,0.95); border-right: 2px solid #8B0000; z-index: 400; transform: translateX(-100%); transition: 0.3s; color: white; padding-top: 10px; display:flex; flex-direction:column;}
         .sidebar.open { transform: translateX(0); }
-        .menu-toggle { position: absolute; top: 10px; left: 10px; z-index: 201; background: #8B0000; color: white; padding: 8px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; border: 2px solid #ff4444; font-family: 'Cinzel', serif; }
+        .menu-toggle { position: absolute; top: 10px; left: 10px; z-index: 401; background: #8B0000; color: white; padding: 8px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; border: 2px solid #ff4444; font-family: 'Cinzel', serif; }
+        
         .sb-header { text-align: center; padding: 10px; border-bottom: 1px solid #444; }
         .rank-badge { background: linear-gradient(135deg, #FFD700, #B8860B); color: black; padding: 5px; border-radius: 4px; font-weight: bold; display: inline-block; font-family: 'Cinzel', serif; margin-top:5px;}
+        
         .sb-stats { padding: 20px; text-align: center; }
         .sb-val { font-size: 1.4rem; color: #00e676; font-weight: bold; }
-        .controls { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 400px; z-index: 100; display: flex; flex-direction: column; gap: 10px; }
-        button { padding: 18px; border: none; border-radius: 12px; font-size: 1.2rem; font-weight: bold; cursor: pointer; font-family: 'Cinzel', serif; text-transform: uppercase; }
-        #startBtn { background: linear-gradient(180deg, #00e676, #00c853); }
+        .sb-sub { color:#aaa; font-size:0.8rem; margin-bottom: 15px; }
+
+        .points-box { background: #111; border: 1px solid #C5A059; padding: 10px; margin: 10px; border-radius: 6px; }
+        .points-val { color: #C5A059; font-size: 1.2rem; font-weight: bold; }
+
+        .controls { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 400px; z-index: 300; display: flex; flex-direction: column; gap: 10px; }
+        button { padding: 15px; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: bold; cursor: pointer; font-family: 'Cinzel', serif; text-transform: uppercase; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        
+        #startBtn { background: linear-gradient(180deg, #00e676, #00c853); color: #003300; }
         #stopBtn { background: linear-gradient(180deg, #ff1744, #d50000); color: white; display: none; }
+        
+        /* GUARD BUTTON STYLES */
+        #guardBtn { background: linear-gradient(180deg, #FFD700, #B8860B); color: #220; display: none; border: 2px solid #fff; animation: popIn 0.3s ease; }
+        #guardBtn:disabled { background: #444; color: #888; border-color: #555; }
+        @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        .toast { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); padding: 15px 25px; border-radius: 50px; color: white; font-weight: bold; border: 2px solid #ff4444; display: none; z-index: 500; text-align: center; white-space: nowrap; box-shadow: 0 0 20px rgba(255, 0, 0, 0.4); }
+
         .sb-clan { flex: 1; padding: 10px; overflow-y: auto; border-top: 1px solid #444; }
         .lb-item { display: flex; justify-content: space-between; padding: 5px; border-bottom: 1px solid #333; font-size: 0.85rem; }
         .logout-btn-sb { padding: 10px; border: 1px solid #ff4444; color: #ff4444; background: none; margin: 10px; cursor: pointer; }
@@ -26,17 +43,26 @@
 </head>
 <body>
     <div class="menu-toggle" id="menuBtn">☰ STATS</div>
+    <div id="toast" class="toast">⚠️ WARNING</div>
+
     <div class="sidebar" id="sidebar">
         <div class="sb-header"><div id="sbUser">...</div><div id="sbRank" class="rank-badge">Peasant</div></div>
         <div class="sb-stats">
-            <div style="margin-bottom:15px;"><div class="sb-val" id="sbArea">0 m²</div><div style="color:#aaa; font-size:0.8rem;">TOTAL AREA</div></div>
-            <div><div class="sb-val" id="sbCount">0</div><div style="color:#aaa; font-size:0.8rem;">TERRITORIES</div></div>
+            <div><div class="sb-val" id="sbArea">0 m²</div><div class="sb-sub">TOTAL AREA</div></div>
+            <div class="points-box">
+                <div>CREDIT POINTS</div>
+                <div class="points-val" id="sbPoints">0</div>
+                <div style="font-size:0.8rem; color:#888;">Streak: <span id="sbStreak" style="color:white;">0</span> Days</div>
+            </div>
         </div>
         <div class="sb-clan" id="clanSection" style="display:none;"><div style="color:#C5A059; text-align:center; font-family:'Cinzel', serif;">CLAN RANKING</div><div id="clanLeaderboard"></div></div>
         <button class="logout-btn-sb" onclick="window.logout()">LOGOUT</button>
     </div>
+
     <div id="map"></div>
+    
     <div class="controls">
+        <button id="guardBtn" onclick="window.deployGuard()">🛡️ Deploy Guard</button>
         <button id="startBtn">⚔️ Start Conquest</button>
         <button id="stopBtn">🚩 Claim Territory</button>
         <a href="dashboard.html" style="background:white; text-align:center; padding:10px; border-radius:8px; font-weight:bold; color:black; text-decoration:none; font-family:'Cinzel', serif;">Exit to Command</a>
@@ -51,15 +77,35 @@
         const db = getDatabase(app);
         
         let map, userMarker, activePolyline, watchId, pathCoords = [];
+        let allPolygons = []; 
+        let lastKnownPos = null; // Store position to fix timing issues
+        
         const currentUser = localStorage.getItem('currentUser');
         const userIcon = localStorage.getItem('userIcon') || "👤";
         let myClan = null;
+        let myClanMembers = {};
+        
+        let currentStreak = 0;
+        let totalPoints = 0;
+        let lastConquestDate = 0;
+        
+        let currentTerritoryId = null;
+        let currentTerritoryData = null;
 
         if(!currentUser) window.location.href = 'index.html';
         document.getElementById('sbUser').innerText = `${userIcon} ${currentUser}`;
         document.getElementById('menuBtn').addEventListener('click', () => document.getElementById('sidebar').classList.toggle('open'));
 
         window.logout = function() { if(confirm("Logout?")) { localStorage.clear(); window.location.href = 'index.html'; }};
+        
+        function showToast(msg, isBad=false) {
+            const t = document.getElementById('toast');
+            t.innerText = msg;
+            t.style.display = 'block';
+            t.style.borderColor = isBad ? '#ff1744' : '#00e676';
+            t.style.color = isBad ? '#ff8a80' : '#b9f6ca';
+            setTimeout(() => { t.style.display = 'none'; }, 3000);
+        }
 
         function calculateRank(area) {
             if (area >= 100000) return "👑 KING";
@@ -74,31 +120,123 @@
                 zoom: 19, center: { lat: 0, lng: 0 }, mapTypeId: 'terrain', disableDefaultUI: true,
                 styles: [{ elementType: "geometry", stylers: [{ color: "#242f3e" }] }, { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] }, { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] }, { featureType: "road", elementType: "geometry", stylers: [{ color: "#38414e" }] }]
             });
+            
+            // Order matters: Start listening to data, then start GPS
+            loadTerritories(); 
+            loadUserData();
+
             if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(pos => {
+                navigator.geolocation.watchPosition(pos => {
                     const latLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                    map.setCenter(latLng); updateUserMarker(latLng);
-                });
+                    lastKnownPos = latLng; // Update global state
+                    updateUserMarker(latLng);
+                    checkGuardProximity(latLng);
+                }, err => console.error(err), { enableHighAccuracy: true });
             }
-            loadTerritories(); loadUserData();
         };
 
         function updateUserMarker(pos) {
-            if (!userMarker) userMarker = new google.maps.Marker({ position: pos, map: map, label: { text: userIcon, fontSize: "24px", color: "white" }, title: currentUser });
-            else userMarker.setPosition(pos);
+            if (!userMarker) {
+                userMarker = new google.maps.Marker({ position: pos, map: map, label: { text: userIcon, fontSize: "24px", color: "white" }, title: currentUser });
+                map.setCenter(pos);
+            } else {
+                userMarker.setPosition(pos);
+            }
         }
 
+        // --- CHECK PROXIMITY ---
+        function checkGuardProximity(pos) {
+            // Guard against running before Turf or Data is ready
+            if(!allPolygons.length || !pos) return;
+
+            const pt = turf.point([pos.lng, pos.lat]);
+            let standingIn = null;
+            let standingId = null;
+
+            for(const pData of allPolygons) {
+                if (turf.booleanPointInPolygon(pt, pData.polygon)) {
+                    standingIn = pData.data;
+                    standingId = pData.id;
+                    break;
+                }
+            }
+
+            const guardBtn = document.getElementById('guardBtn');
+
+            if (standingIn) {
+                // If it is guarded and NOT mine = Warning
+                if (standingIn.guarded && standingIn.owner !== currentUser) {
+                    showToast("⛔ GUARD DETECTED! AREA SECURED", true);
+                    guardBtn.style.display = 'none';
+                }
+                // If it is MINE and NOT guarded = Show Button
+                else if (standingIn.owner === currentUser && !standingIn.guarded) {
+                    currentTerritoryId = standingId;
+                    currentTerritoryData = standingIn;
+                    
+                    const cost = Math.ceil((standingIn.areaSize || 0) / 500) * 10;
+                    guardBtn.innerHTML = `🛡️ Deploy Guard (${cost} Pts)`;
+                    guardBtn.dataset.cost = cost;
+                    guardBtn.style.display = 'block';
+                    guardBtn.disabled = (totalPoints < cost);
+                } 
+                else {
+                    guardBtn.style.display = 'none';
+                }
+            } else {
+                guardBtn.style.display = 'none';
+                currentTerritoryId = null;
+            }
+        }
+
+        window.deployGuard = async () => {
+            if (!currentTerritoryId) return;
+            const cost = parseInt(document.getElementById('guardBtn').dataset.cost);
+            
+            if (totalPoints < cost) return alert("Not enough Credit Points!");
+            if (!confirm(`Deploy Guard for ${cost} points?`)) return;
+
+            const updates = {};
+            updates[`users/${currentUser}/creditPoints`] = totalPoints - cost;
+            updates[`territories/${currentTerritoryId}/guarded`] = true;
+            updates[`territories/${currentTerritoryId}/guardCost`] = cost;
+
+            try {
+                await update(ref(db), updates);
+                alert("Guard Deployed! 🛡️");
+                document.getElementById('guardBtn').style.display = 'none';
+            } catch(e) { alert(e.message); }
+        };
+
         function loadUserData() {
-            get(child(ref(db), `users/${currentUser}`)).then(snap => { if(snap.val() && snap.val().clan) { myClan = snap.val().clan; document.getElementById('clanSection').style.display = 'block'; }});
+            onValue(ref(db, `users/${currentUser}`), (snap) => {
+                const u = snap.val();
+                if(!u) return;
+                myClan = u.clan || null;
+                currentStreak = u.streak || 0;
+                totalPoints = u.creditPoints || 0;
+                lastConquestDate = u.lastActiveDate || 0;
+
+                document.getElementById('sbPoints').innerText = totalPoints;
+                document.getElementById('sbStreak').innerText = currentStreak;
+
+                // Re-check proximity in case points changed (to unlock/lock button)
+                if(lastKnownPos) checkGuardProximity(lastKnownPos);
+
+                if(myClan) { 
+                    document.getElementById('clanSection').style.display = 'block'; 
+                    get(child(ref(db), `clans/${myClan}/members`)).then(mSnap => { myClanMembers = mSnap.val() || {}; });
+                }
+            });
+
             onValue(ref(db, 'territories'), (snapshot) => {
                 const data = snapshot.val() || {};
-                let myArea = 0, myCount = 0, clanStats = {};
+                let myArea = 0, clanStats = {};
                 Object.values(data).forEach(t => {
-                    if (t.owner === currentUser) { myArea += (t.areaSize||0); myCount++; }
+                    if (t.owner === currentUser) { myArea += (t.areaSize||0); }
                     if (myClan) { if (!clanStats[t.owner]) clanStats[t.owner] = 0; clanStats[t.owner] += (t.areaSize||0); }
                 });
                 document.getElementById('sbArea').innerText = Math.round(myArea).toLocaleString() + " m²";
-                document.getElementById('sbCount').innerText = myCount;
                 document.getElementById('sbRank').innerText = calculateRank(myArea);
                 if (myClan) updateClanLeaderboard(clanStats);
             });
@@ -117,6 +255,8 @@
             if (!map) return alert("Map loading...");
             pathCoords = []; activePolyline = new google.maps.Polyline({ path: [], strokeColor: "#FFFF00", strokeWeight: 6, map: map });
             document.getElementById('startBtn').style.display = 'none'; document.getElementById('stopBtn').style.display = 'block';
+            document.getElementById('guardBtn').style.display = 'none';
+            
             watchId = navigator.geolocation.watchPosition(pos => {
                 const latLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                 pathCoords.push(latLng); activePolyline.getPath().push(new google.maps.LatLng(latLng.lat, latLng.lng));
@@ -124,20 +264,165 @@
             }, err => console.error(err), { enableHighAccuracy: true });
         });
 
+        function calculateNewPoints(streakDay) {
+            if (streakDay === 1) return 1;
+            if (streakDay === 2) return 2;
+            if (streakDay === 3) return 4;
+            if (streakDay === 4) return 8;
+            if (streakDay >= 5 && streakDay < 90) return 5;
+            if (streakDay >= 90) return 8;
+            return 1; 
+        }
+
         document.getElementById('stopBtn').addEventListener('click', async () => {
             navigator.geolocation.clearWatch(watchId);
             document.getElementById('startBtn').style.display = 'block'; document.getElementById('stopBtn').style.display = 'none';
             if (pathCoords.length < 3) { activePolyline.setMap(null); return alert("Path too short."); }
-            const area = google.maps.geometry.spherical.computeArea(activePolyline.getPath());
-            const newKey = push(ref(db, 'territories')).key;
-            await update(ref(db), { [`territories/${newKey}`]: { owner: currentUser, coords: pathCoords, areaSize: area, timestamp: Date.now() } });
-            alert(`Captured ${Math.round(area)} m²!`); activePolyline.setMap(null);
+
+            const turfCoords = pathCoords.map(p => [p.lng, p.lat]);
+            turfCoords.push([pathCoords[0].lng, pathCoords[0].lat]); 
+            const newPoly = turf.polygon([turfCoords]);
+            
+            const rawArea = google.maps.geometry.spherical.computeArea(activePolyline.getPath());
+            let finalMyArea = rawArea;
+
+            const btn = document.getElementById('startBtn');
+            btn.innerText = "Calculations..."; btn.disabled = true;
+
+            try {
+                const snapshot = await get(ref(db, 'territories'));
+                const territories = snapshot.val() || {};
+                const updates = {};
+                let stolenText = "";
+                let guardBlocked = false;
+
+                for (const [key, t] of Object.entries(territories)) {
+                    if(!t.coords || t.owner === currentUser) continue;
+                    
+                    const tCoords = t.coords.map(c => [c.lng, c.lat]);
+                    tCoords.push([t.coords[0].lng, t.coords[0].lat]);
+                    const existingPoly = turf.polygon([tCoords]);
+
+                    const intersection = turf.intersect(newPoly, existingPoly);
+                    
+                    if (intersection) {
+                        const overlapArea = turf.area(intersection);
+                        if (overlapArea > 0) {
+                            if (t.guarded) {
+                                guardBlocked = true;
+                                finalMyArea -= overlapArea;
+                                continue;
+                            }
+                            const isAlly = myClanMembers[t.owner] ? true : false;
+                            let currentEnemyArea = t.areaSize || 0;
+                            if (isAlly) {
+                                let newEnemyArea = Math.max(0, currentEnemyArea - (overlapArea / 2));
+                                updates[`territories/${key}/areaSize`] = newEnemyArea;
+                                finalMyArea -= (overlapArea / 2);
+                                stolenText += `\nShared ${Math.round(overlapArea)}m² with ally ${t.owner}`;
+                            } else {
+                                let newEnemyArea = Math.max(0, currentEnemyArea - overlapArea);
+                                updates[`territories/${key}/areaSize`] = newEnemyArea;
+                                stolenText += `\nSeized ${Math.round(overlapArea)}m² from ${t.owner}`;
+                            }
+                        }
+                    }
+                }
+
+                if (guardBlocked) alert("⚠️ GUARD ENCOUNTERED! ⚠️\nProtected areas were not captured.");
+
+                if (finalMyArea > 10) {
+                    const newKey = push(ref(db, 'territories')).key;
+                    updates[`territories/${newKey}`] = { owner: currentUser, coords: pathCoords, areaSize: finalMyArea, timestamp: Date.now() };
+
+                    let pointMsg = "";
+                    if (finalMyArea >= 100) {
+                        const now = new Date();
+                        const todayStr = now.toDateString();
+                        const lastDate = lastConquestDate ? new Date(lastConquestDate) : null;
+                        let newStreak = 1;
+                        let pointsToAdd = 0;
+
+                        if (!lastDate || lastDate.toDateString() !== todayStr) {
+                             if (lastDate) {
+                                const oneDay = 24 * 60 * 60 * 1000;
+                                const d1 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                                const d2 = new Date(lastDate.getFullYear(), lastDate.getMonth(), lastDate.getDate());
+                                const diffDays = Math.round(Math.abs((d1 - d2) / oneDay));
+                                if (diffDays === 1) newStreak = currentStreak + 1;
+                            }
+                            pointsToAdd = calculateNewPoints(newStreak);
+                        } else {
+                            newStreak = currentStreak; 
+                            pointMsg = "\n(Daily points already claimed)";
+                        }
+
+                        if (pointsToAdd > 0) {
+                            pointMsg = `\n+${pointsToAdd} Credit Points! (Streak: ${newStreak})`;
+                            updates[`users/${currentUser}/creditPoints`] = totalPoints + pointsToAdd;
+                        }
+                        updates[`users/${currentUser}/streak`] = newStreak;
+                        updates[`users/${currentUser}/lastActiveDate`] = Date.now();
+                    }
+
+                    await update(ref(db), updates);
+                    alert(`Conquest Complete!\nClaimed: ${Math.round(finalMyArea)} m²${stolenText}${pointMsg}`);
+                } else {
+                    alert("Area too small or blocked by guards.");
+                }
+
+            } catch(e) { console.error(e); alert("Error: " + e.message); }
+
+            activePolyline.setMap(null);
+            btn.innerText = "⚔️ Start Conquest"; btn.disabled = false;
         });
 
+        // --- LOAD POLYGONS ---
         function loadTerritories() {
             onValue(ref(db, 'territories'), (snapshot) => {
                 const data = snapshot.val();
-                if (data) Object.values(data).forEach(t => { new google.maps.Polygon({ paths: t.coords, fillColor: t.owner === currentUser ? '#00e676' : '#ff1744', fillOpacity: 0.35, strokeWeight: 1, map: map }); });
+                
+                // Note: Ideally clear map here, but for brevity we append.
+                allPolygons = []; // Reset Hit Test Data
+
+                if (data) Object.entries(data).forEach(([key, t]) => { 
+                    let strokeC = t.guarded ? '#FFD700' : '#222';
+                    let strokeW = t.guarded ? 3 : 1;
+                    let fillC = t.owner === currentUser ? '#00e676' : (myClanMembers[t.owner] ? '#C5A059' : '#ff1744');
+                    
+                    // Visuals
+                    new google.maps.Polygon({ 
+                        paths: t.coords, 
+                        fillColor: fillC, 
+                        fillOpacity: 0.25, 
+                        strokeColor: strokeC,
+                        strokeWeight: strokeW, 
+                        map: map,
+                        clickable: false,
+                        zIndex: t.guarded ? 10 : 1
+                    });
+                    
+                    if(t.guarded) {
+                        const bounds = new google.maps.LatLngBounds();
+                        t.coords.forEach(c => bounds.extend(c));
+                        new google.maps.Marker({
+                            position: bounds.getCenter(),
+                            map: map,
+                            label: { text: "🛡️", fontSize: "16px" },
+                            icon: { path: google.maps.SymbolPath.CIRCLE, scale: 0 }
+                        });
+                    }
+
+                    // Turf Logic
+                    const tCoords = t.coords.map(c => [c.lng, c.lat]);
+                    tCoords.push([t.coords[0].lng, t.coords[0].lat]);
+                    const turfPoly = turf.polygon([tCoords]);
+                    
+                    allPolygons.push({ id: key, data: t, polygon: turfPoly });
+                });
+
+                // --- CRITICAL FIX: If GPS loaded before Data, run check now ---
+                if(lastKnownPos) checkGuardProximity(lastKnownPos);
             });
         }
     </script>

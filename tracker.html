@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code & Cardio Tracker</title>
+    <style>
+        /* --- CSS STYLING --- */
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Prevents scrollbars from the canvas */
+            background: #000;
+            font-family: 'Courier New', Courier, monospace;
+            color: #0f0;
+        }
+
+        /* The Background Canvas for the Code Effect */
+        #codeCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1; /* Sits behind the tracker */
+        }
+
+        /* The Foreground Tracker Container */
+        .tracker-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2; /* Sits on top of the code */
+            
+            /* Glassmorphism Effect */
+            background: rgba(0, 20, 0, 0.85); /* Dark semi-transparent green */
+            backdrop-filter: blur(4px);
+            border: 1px solid #0f0;
+            box-shadow: 0 0 20px #0f0;
+            
+            padding: 2rem;
+            width: 350px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        h1 {
+            margin-top: 0;
+            text-shadow: 0 0 10px #0f0;
+            text-transform: uppercase;
+            font-size: 1.5rem;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            color: #cfc;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+            background: #000;
+            border: 1px solid #0f0;
+            color: #0f0;
+            font-family: inherit;
+            outline: none;
+        }
+
+        input:focus {
+            box-shadow: 0 0 10px #0f0 inset;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #0f0;
+            color: #000;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            background: #fff;
+            box-shadow: 0 0 15px #fff;
+        }
+
+        /* The Log List */
+        .log-area {
+            margin-top: 20px;
+            max-height: 150px;
+            overflow-y: auto;
+            border-top: 1px dashed #0f0;
+            padding-top: 10px;
+            text-align: left;
+        }
+
+        .log-entry {
+            font-size: 0.85rem;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #040;
+            padding-bottom: 4px;
+        }
+
+        .log-entry span {
+            color: #fff;
+        }
+        
+        /* Scrollbar styling for the log */
+        .log-area::-webkit-scrollbar { width: 5px; }
+        .log-area::-webkit-scrollbar-thumb { background: #0f0; }
+    </style>
+</head>
+<body>
+
+    <canvas id="codeCanvas"></canvas>
+
+    <div class="tracker-container">
+        <h1>// RUN_LOG.EXE</h1>
+        
+        <div class="input-group">
+            <label for="distance">Distance (km)</label>
+            <input type="number" id="distance" placeholder="e.g., 5.0" step="0.01">
+        </div>
+
+        <div class="input-group">
+            <label for="time">Duration (minutes)</label>
+            <input type="number" id="time" placeholder="e.g., 30" step="1">
+        </div>
+
+        <button onclick="addLog()">Execute Log</button>
+
+        <div class="log-area" id="logArea">
+            </div>
+    </div>
+
+    <script>
+        /* --- JAVASCRIPT LOGIC --- */
+
+        // 1. MATRIX RAIN EFFECT
+        const canvas = document.getElementById('codeCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Set canvas to full screen
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const characters = '01ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        const fontSize = 16;
+        const columns = canvas.width / fontSize;
+        const drops = [];
+
+        // Initialize drops at the top
+        for (let x = 0; x < columns; x++) {
+            drops[x] = 1;
+        }
+
+        function drawRain() {
+            // Black BG with opacity to create trail effect
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#0F0'; // Green text
+            ctx.font = fontSize + 'px monospace';
+
+            for (let i = 0; i < drops.length; i++) {
+                const text = characters.charAt(Math.floor(Math.random() * characters.length));
+                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+
+                // Send drop back to top randomly
+                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+                drops[i]++;
+            }
+        }
+        
+        // Animate the rain
+        setInterval(drawRain, 33);
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+
+        // 2. TRACKER LOGIC
+        function addLog() {
+            const dist = parseFloat(document.getElementById('distance').value);
+            const time = parseFloat(document.getElementById('time').value);
+            const logArea = document.getElementById('logArea');
+
+            if (!dist || !time) {
+                alert("ERROR: Input data missing.");
+                return;
+            }
+
+            // Calculate Pace (Minutes per km)
+            const paceDecimal = time / dist; 
+            const paceMin = Math.floor(paceDecimal);
+            const paceSec = Math.round((paceDecimal - paceMin) * 60);
+            // Format seconds to always have two digits (e.g., "05" instead of "5")
+            const paceSecStr = paceSec < 10 ? '0' + paceSec : paceSec;
+
+            // Create Log Entry
+            const entryDiv = document.createElement('div');
+            entryDiv.className = 'log-entry';
+            
+            // Get current timestamp
+            const now = new Date();
+            const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            entryDiv.innerHTML = `
+                > [${timeString}] 
+                Dist: <span>${dist}km</span> | 
+                Time: <span>${time}m</span> | 
+                Pace: <span>${paceMin}:${paceSecStr}/km</span>
+            `;
+
+            // Insert at the top of the list
+            logArea.prepend(entryDiv);
+
+            // Clear inputs
+            document.getElementById('distance').value = '';
+            document.getElementById('time').value = '';
+        }
+    </script>
+</body>
+</html>
