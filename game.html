@@ -29,16 +29,22 @@
         #startBtn { background: linear-gradient(180deg, #00e676, #00c853); color: #003300; }
         #stopBtn { background: linear-gradient(180deg, #ff1744, #d50000); color: white; display: none; }
         
-        /* GUARD BUTTON STYLES */
-        #guardBtn { background: linear-gradient(180deg, #FFD700, #B8860B); color: #220; display: none; border: 2px solid #fff; animation: popIn 0.3s ease; }
-        #guardBtn:disabled { background: #444; color: #888; border-color: #555; }
-        @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-
         .toast { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); padding: 15px 25px; border-radius: 50px; color: white; font-weight: bold; border: 2px solid #ff4444; display: none; z-index: 500; text-align: center; white-space: nowrap; box-shadow: 0 0 20px rgba(255, 0, 0, 0.4); }
 
         .sb-clan { flex: 1; padding: 10px; overflow-y: auto; border-top: 1px solid #444; }
         .lb-item { display: flex; justify-content: space-between; padding: 5px; border-bottom: 1px solid #333; font-size: 0.85rem; }
         .logout-btn-sb { padding: 10px; border: 1px solid #ff4444; color: #ff4444; background: none; margin: 10px; cursor: pointer; }
+
+        /* MODAL STYLES */
+        .modal { display: none; position: fixed; z-index: 999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); align-items: center; justify-content: center; }
+        .modal-content { background: #1a1a1a; padding: 25px; border: 2px solid #C5A059; border-radius: 8px; width: 90%; max-width: 400px; color: white; text-align: center; position: relative; }
+        .modal h2 { color: #C5A059; margin-top: 0; font-family: 'Cinzel', serif; }
+        .modal-stat { display: flex; justify-content: space-between; margin: 10px 0; border-bottom: 1px solid #333; padding-bottom: 5px; }
+        .range-wrap { margin: 20px 0; }
+        input[type=range] { width: 100%; }
+        .btn-confirm { background: #00e676; color: black; border: none; padding: 12px; width: 100%; font-weight: bold; cursor: pointer; border-radius: 4px; margin-top: 10px; font-size: 1.1rem; }
+        .btn-cancel { background: none; border: 1px solid #444; color: #888; padding: 10px; width: 100%; margin-top: 10px; cursor: pointer; border-radius: 4px; }
+        .helper-text { font-size: 0.8rem; color: #888; margin-bottom: 15px; white-space: pre-line; }
     </style>
 </head>
 <body>
@@ -62,10 +68,35 @@
     <div id="map"></div>
     
     <div class="controls">
-        <button id="guardBtn" onclick="window.deployGuard()">🛡️ Deploy Guard</button>
+        <div style="background:rgba(0,0,0,0.7); padding:10px; border-radius:8px; margin-bottom:10px; text-align:center; color:#ccc; font-size:0.9rem;">
+            💡 Tap Green/Gold territories to deploy guards
+        </div>
         <button id="startBtn">⚔️ Start Conquest</button>
         <button id="stopBtn">🚩 Claim Territory</button>
         <a href="dashboard.html" style="background:white; text-align:center; padding:10px; border-radius:8px; font-weight:bold; color:black; text-decoration:none; font-family:'Cinzel', serif;">Exit to Command</a>
+    </div>
+
+    <div id="guardModal" class="modal">
+        <div class="modal-content">
+            <h2 id="mTitle">🛡️ Secure Territory</h2>
+            <div id="mHelper" class="helper-text">...</div>
+            
+            <div class="modal-stat"><span>Territory Area:</span><span id="mArea">...</span></div>
+            <div class="modal-stat"><span>Guards Needed:</span><span id="mReq" style="color:#FFD700">...</span></div>
+            
+            <div class="range-wrap">
+                <label>Deploy Count: <span id="mCountVal" style="font-weight:bold; font-size:1.2rem; color:#00e676;">1</span></label>
+                <input type="range" id="mRange" min="1" max="1" value="1" step="1">
+            </div>
+
+            <div style="background:#222; padding:10px; border-radius:4px; margin-bottom:10px;">
+                <div style="display:flex; justify-content:space-between;"><span>Total Cost:</span><span id="mCost" style="color:#ff4444; font-weight:bold;">10 Pts</span></div>
+                <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#888;"><span>Duration:</span><span>7 Days</span></div>
+            </div>
+
+            <button id="btnConfirm" class="btn-confirm">DEPLOY GUARDS</button>
+            <button class="btn-cancel" onclick="document.getElementById('guardModal').style.display='none'">Cancel</button>
+        </div>
     </div>
 
     <script type="module">
@@ -77,8 +108,9 @@
         const db = getDatabase(app);
         
         let map, userMarker, activePolyline, watchId, pathCoords = [];
-        let allPolygons = []; 
-        let lastKnownPos = null; // Store position to fix timing issues
+        let allPolygons = []; // Stores logic data (even invisible ones)
+        let visualPolygons = []; // Stores actual map objects
+        let lastKnownPos = null;
         
         const currentUser = localStorage.getItem('currentUser');
         const userIcon = localStorage.getItem('userIcon') || "👤";
@@ -89,8 +121,8 @@
         let totalPoints = 0;
         let lastConquestDate = 0;
         
-        let currentTerritoryId = null;
-        let currentTerritoryData = null;
+        // Guard Modal Logic Vars
+        let selectedLandId = null;
 
         if(!currentUser) window.location.href = 'index.html';
         document.getElementById('sbUser').innerText = `${userIcon} ${currentUser}`;
@@ -121,14 +153,13 @@
                 styles: [{ elementType: "geometry", stylers: [{ color: "#242f3e" }] }, { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] }, { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] }, { featureType: "road", elementType: "geometry", stylers: [{ color: "#38414e" }] }]
             });
             
-            // Order matters: Start listening to data, then start GPS
-            loadTerritories(); 
+            // Wait for user data (clan) before loading territories to ensure visibility logic works
             loadUserData();
 
             if (navigator.geolocation) {
                 navigator.geolocation.watchPosition(pos => {
                     const latLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                    lastKnownPos = latLng; // Update global state
+                    lastKnownPos = latLng;
                     updateUserMarker(latLng);
                     checkGuardProximity(latLng);
                 }, err => console.error(err), { enableHighAccuracy: true });
@@ -144,69 +175,23 @@
             }
         }
 
-        // --- CHECK PROXIMITY ---
         function checkGuardProximity(pos) {
-            // Guard against running before Turf or Data is ready
             if(!allPolygons.length || !pos) return;
-
             const pt = turf.point([pos.lng, pos.lat]);
-            let standingIn = null;
-            let standingId = null;
-
+            
             for(const pData of allPolygons) {
                 if (turf.booleanPointInPolygon(pt, pData.polygon)) {
-                    standingIn = pData.data;
-                    standingId = pData.id;
-                    break;
+                    const t = pData.data;
+                    // Warning only if it's an active enemy guard
+                    if (t.guarded && t.owner !== currentUser) {
+                         if(!t.guardExpiry || t.guardExpiry > Date.now()) {
+                            showToast("⛔ GUARD DETECTED! AREA SECURED", true);
+                         }
+                    }
+                    return; 
                 }
-            }
-
-            const guardBtn = document.getElementById('guardBtn');
-
-            if (standingIn) {
-                // If it is guarded and NOT mine = Warning
-                if (standingIn.guarded && standingIn.owner !== currentUser) {
-                    showToast("⛔ GUARD DETECTED! AREA SECURED", true);
-                    guardBtn.style.display = 'none';
-                }
-                // If it is MINE and NOT guarded = Show Button
-                else if (standingIn.owner === currentUser && !standingIn.guarded) {
-                    currentTerritoryId = standingId;
-                    currentTerritoryData = standingIn;
-                    
-                    const cost = Math.ceil((standingIn.areaSize || 0) / 500) * 10;
-                    guardBtn.innerHTML = `🛡️ Deploy Guard (${cost} Pts)`;
-                    guardBtn.dataset.cost = cost;
-                    guardBtn.style.display = 'block';
-                    guardBtn.disabled = (totalPoints < cost);
-                } 
-                else {
-                    guardBtn.style.display = 'none';
-                }
-            } else {
-                guardBtn.style.display = 'none';
-                currentTerritoryId = null;
             }
         }
-
-        window.deployGuard = async () => {
-            if (!currentTerritoryId) return;
-            const cost = parseInt(document.getElementById('guardBtn').dataset.cost);
-            
-            if (totalPoints < cost) return alert("Not enough Credit Points!");
-            if (!confirm(`Deploy Guard for ${cost} points?`)) return;
-
-            const updates = {};
-            updates[`users/${currentUser}/creditPoints`] = totalPoints - cost;
-            updates[`territories/${currentTerritoryId}/guarded`] = true;
-            updates[`territories/${currentTerritoryId}/guardCost`] = cost;
-
-            try {
-                await update(ref(db), updates);
-                alert("Guard Deployed! 🛡️");
-                document.getElementById('guardBtn').style.display = 'none';
-            } catch(e) { alert(e.message); }
-        };
 
         function loadUserData() {
             onValue(ref(db, `users/${currentUser}`), (snap) => {
@@ -220,26 +205,28 @@
                 document.getElementById('sbPoints').innerText = totalPoints;
                 document.getElementById('sbStreak').innerText = currentStreak;
 
-                // Re-check proximity in case points changed (to unlock/lock button)
-                if(lastKnownPos) checkGuardProximity(lastKnownPos);
-
                 if(myClan) { 
                     document.getElementById('clanSection').style.display = 'block'; 
-                    get(child(ref(db), `clans/${myClan}/members`)).then(mSnap => { myClanMembers = mSnap.val() || {}; });
+                    get(child(ref(db), `clans/${myClan}/members`)).then(mSnap => { 
+                        myClanMembers = mSnap.val() || {}; 
+                        loadTerritories(); // Reload map after getting clan data
+                    });
+                } else {
+                    myClanMembers = {};
+                    loadTerritories();
                 }
             });
+        }
 
-            onValue(ref(db, 'territories'), (snapshot) => {
-                const data = snapshot.val() || {};
-                let myArea = 0, clanStats = {};
-                Object.values(data).forEach(t => {
-                    if (t.owner === currentUser) { myArea += (t.areaSize||0); }
-                    if (myClan) { if (!clanStats[t.owner]) clanStats[t.owner] = 0; clanStats[t.owner] += (t.areaSize||0); }
-                });
-                document.getElementById('sbArea').innerText = Math.round(myArea).toLocaleString() + " m²";
-                document.getElementById('sbRank').innerText = calculateRank(myArea);
-                if (myClan) updateClanLeaderboard(clanStats);
+        function loadStatsAndRank(data) {
+            let myArea = 0, clanStats = {};
+            Object.values(data).forEach(t => {
+                if (t.owner === currentUser) { myArea += (t.areaSize||0); }
+                if (myClan) { if (!clanStats[t.owner]) clanStats[t.owner] = 0; clanStats[t.owner] += (t.areaSize||0); }
             });
+            document.getElementById('sbArea').innerText = Math.round(myArea).toLocaleString() + " m²";
+            document.getElementById('sbRank').innerText = calculateRank(myArea);
+            if (myClan) updateClanLeaderboard(clanStats);
         }
 
         async function updateClanLeaderboard(rawStats) {
@@ -251,11 +238,87 @@
             document.getElementById('clanLeaderboard').innerHTML = lb.slice(0, 10).map((p, i) => `<div class="lb-item"><span>#${i+1} ${p.name}</span><span style="color:#aaa;">${Math.round(p.score)}</span></div>`).join('');
         }
 
+        // --- MAP CLICK / MODAL LOGIC ---
+        
+        const rangeInput = document.getElementById('mRange');
+        rangeInput.addEventListener('input', (e) => updateModalCalc(e.target.value));
+
+        function updateModalCalc(val) {
+            document.getElementById('mCountVal').innerText = val;
+            const cost = val * 10;
+            const costEl = document.getElementById('mCost');
+            costEl.innerText = cost + " Pts";
+            
+            const btn = document.getElementById('btnConfirm');
+            if (totalPoints < cost) {
+                costEl.style.color = "red";
+                btn.disabled = true;
+                btn.innerText = "NOT ENOUGH POINTS";
+                btn.style.background = "#444";
+            } else {
+                costEl.style.color = "#ff4444";
+                btn.disabled = false;
+                btn.innerText = "DEPLOY GUARDS";
+                btn.style.background = "#00e676";
+            }
+        }
+
+        // Updated Modal Open Logic to handle Ally Difference
+        window.openDeploymentModal = (landId, area, isAlly = false) => {
+            selectedLandId = landId;
+            const coverage = isAlly ? 250 : 500; // Reduced efficiency for allies
+            const requiredGuards = Math.ceil(area / coverage);
+            
+            // Update Text
+            const titleEl = document.getElementById('mTitle');
+            const helpEl = document.getElementById('mHelper');
+            
+            if (isAlly) {
+                titleEl.innerText = "🛡️ Reinforce Ally";
+                helpEl.innerText = `Ally Territory (Reduced Efficiency)\n1 Guard per 250m². Cost: 10 Pts/Guard.`;
+            } else {
+                titleEl.innerText = "🛡️ Secure Territory";
+                helpEl.innerText = `Personal Territory\n1 Guard per 500m². Cost: 10 Pts/Guard.`;
+            }
+
+            document.getElementById('mArea').innerText = Math.round(area) + " m²";
+            document.getElementById('mReq').innerText = requiredGuards;
+            
+            rangeInput.max = requiredGuards;
+            rangeInput.min = 1;
+            rangeInput.value = requiredGuards;
+            
+            updateModalCalc(requiredGuards);
+            document.getElementById('guardModal').style.display = 'flex';
+        };
+
+        document.getElementById('btnConfirm').addEventListener('click', async () => {
+            if (!selectedLandId) return;
+            const count = parseInt(rangeInput.value);
+            const cost = count * 10;
+            
+            if (totalPoints < cost) return alert("Insufficient points!");
+            
+            const updates = {};
+            updates[`users/${currentUser}/creditPoints`] = totalPoints - cost;
+            updates[`territories/${selectedLandId}/guarded`] = true;
+            updates[`territories/${selectedLandId}/guardCount`] = count;
+            updates[`territories/${selectedLandId}/guardExpiry`] = Date.now() + (7 * 24 * 60 * 60 * 1000);
+
+            try {
+                await update(ref(db), updates);
+                alert("Guards Deployed! Area secured for 7 days.");
+                document.getElementById('guardModal').style.display = 'none';
+            } catch(e) { alert(e.message); }
+        });
+
+
+        // --- MAIN GAMEPLAY LOGIC ---
+
         document.getElementById('startBtn').addEventListener('click', () => {
             if (!map) return alert("Map loading...");
             pathCoords = []; activePolyline = new google.maps.Polyline({ path: [], strokeColor: "#FFFF00", strokeWeight: 6, map: map });
             document.getElementById('startBtn').style.display = 'none'; document.getElementById('stopBtn').style.display = 'block';
-            document.getElementById('guardBtn').style.display = 'none';
             
             watchId = navigator.geolocation.watchPosition(pos => {
                 const latLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
@@ -308,11 +371,22 @@
                     if (intersection) {
                         const overlapArea = turf.area(intersection);
                         if (overlapArea > 0) {
+                            
+                            let isProtected = false;
                             if (t.guarded) {
+                                if (t.guardExpiry && t.guardExpiry > Date.now()) {
+                                    isProtected = true;
+                                } else {
+                                    updates[`territories/${key}/guarded`] = null; 
+                                }
+                            }
+
+                            if (isProtected) {
                                 guardBlocked = true;
                                 finalMyArea -= overlapArea;
                                 continue;
                             }
+                            
                             const isAlly = myClanMembers[t.owner] ? true : false;
                             let currentEnemyArea = t.areaSize || 0;
                             if (isAlly) {
@@ -377,52 +451,76 @@
             btn.innerText = "⚔️ Start Conquest"; btn.disabled = false;
         });
 
-        // --- LOAD POLYGONS ---
+        // --- RENDER VISIBILE POLYGONS ---
         function loadTerritories() {
             onValue(ref(db, 'territories'), (snapshot) => {
                 const data = snapshot.val();
                 
-                // Note: Ideally clear map here, but for brevity we append.
-                allPolygons = []; // Reset Hit Test Data
+                // 1. Clear existing visuals
+                visualPolygons.forEach(obj => {
+                    obj.poly.setMap(null);
+                    if(obj.marker) obj.marker.setMap(null);
+                });
+                visualPolygons = [];
+                allPolygons = []; // Reset logic cache
+
+                loadStatsAndRank(data || {});
 
                 if (data) Object.entries(data).forEach(([key, t]) => { 
-                    let strokeC = t.guarded ? '#FFD700' : '#222';
-                    let strokeW = t.guarded ? 3 : 1;
-                    let fillC = t.owner === currentUser ? '#00e676' : (myClanMembers[t.owner] ? '#C5A059' : '#ff1744');
                     
-                    // Visuals
-                    new google.maps.Polygon({ 
-                        paths: t.coords, 
-                        fillColor: fillC, 
-                        fillOpacity: 0.25, 
-                        strokeColor: strokeC,
-                        strokeWeight: strokeW, 
-                        map: map,
-                        clickable: false,
-                        zIndex: t.guarded ? 10 : 1
-                    });
-                    
-                    if(t.guarded) {
-                        const bounds = new google.maps.LatLngBounds();
-                        t.coords.forEach(c => bounds.extend(c));
-                        new google.maps.Marker({
-                            position: bounds.getCenter(),
-                            map: map,
-                            label: { text: "🛡️", fontSize: "16px" },
-                            icon: { path: google.maps.SymbolPath.CIRCLE, scale: 0 }
-                        });
-                    }
-
-                    // Turf Logic
+                    // Logic: Add to allPolygons (Invisible or not, we need it for hit-tests)
                     const tCoords = t.coords.map(c => [c.lng, c.lat]);
                     tCoords.push([t.coords[0].lng, t.coords[0].lat]);
                     const turfPoly = turf.polygon([tCoords]);
-                    
                     allPolygons.push({ id: key, data: t, polygon: turfPoly });
-                });
 
-                // --- CRITICAL FIX: If GPS loaded before Data, run check now ---
-                if(lastKnownPos) checkGuardProximity(lastKnownPos);
+                    // Visibility Check: Mine OR Ally
+                    const isMine = t.owner === currentUser;
+                    const isAlly = myClan && myClanMembers[t.owner];
+                    
+                    if (isMine || isAlly) {
+                        let isActiveGuard = t.guarded && (!t.guardExpiry || t.guardExpiry > Date.now());
+
+                        let strokeC = isActiveGuard ? '#FFD700' : '#222';
+                        let strokeW = isActiveGuard ? 3 : 1;
+                        let fillC = isMine ? '#00e676' : '#C5A059'; // Green or Gold
+                        
+                        const poly = new google.maps.Polygon({ 
+                            paths: t.coords, 
+                            fillColor: fillC, 
+                            fillOpacity: 0.25, 
+                            strokeColor: strokeC,
+                            strokeWeight: strokeW, 
+                            map: map,
+                            clickable: true, 
+                            zIndex: isActiveGuard ? 10 : 1
+                        });
+
+                        poly.addListener('click', () => {
+                            // Can guard Mine OR Ally
+                            if (isActiveGuard) {
+                                const daysLeft = Math.ceil((t.guardExpiry - Date.now())/(1000*60*60*24));
+                                alert(`Protected.\nExpires in ${daysLeft} days.`);
+                            } else {
+                                // Pass isAlly flag to modal (true if ally, false if mine)
+                                window.openDeploymentModal(key, t.areaSize || 0, !isMine);
+                            }
+                        });
+                        
+                        let marker = null;
+                        if(isActiveGuard) {
+                            const bounds = new google.maps.LatLngBounds();
+                            t.coords.forEach(c => bounds.extend(c));
+                            marker = new google.maps.Marker({
+                                position: bounds.getCenter(),
+                                map: map,
+                                label: { text: "🛡️", fontSize: "16px" },
+                                icon: { path: google.maps.SymbolPath.CIRCLE, scale: 0 }
+                            });
+                        }
+                        visualPolygons.push({ poly, marker });
+                    }
+                });
             });
         }
     </script>

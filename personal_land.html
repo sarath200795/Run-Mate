@@ -12,15 +12,33 @@
         .stat-badge { background: #222; padding: 5px 15px; border-radius: 20px; border: 1px solid #444; font-size: 0.9rem; }
         .highlight { color: #00e676; font-weight: bold; }
         .land-list { max-width: 600px; margin: 0 auto; }
-        .land-card { background: #1a1a1a; border: 1px solid #333; border-radius: 8px; overflow: hidden; margin-bottom: 20px; animation: fadein 0.5s; }
+        
+        .land-card { background: #1a1a1a; border: 1px solid #333; border-radius: 8px; overflow: hidden; margin-bottom: 20px; animation: fadein 0.5s; position:relative; }
+        .land-card.guarded-card { border: 2px solid #FFD700; box-shadow: 0 0 10px rgba(255, 215, 0, 0.2); }
+        
         @keyframes fadein { from {opacity:0; transform:translateY(10px);} to {opacity:1; transform:translateY(0);} }
         .map-snap { width: 100%; height: 150px; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; border-bottom: 1px solid #333; }
         .map-snap img { width: 100%; height: 100%; object-fit: cover; }
         .card-details { padding: 15px; }
         .location-name { font-size: 1.1rem; font-weight: bold; color: #C5A059; margin-bottom: 5px; font-family: 'Cinzel', serif; }
-        .location-sub { font-size: 0.8rem; color: #888; display: flex; justify-content: space-between; align-items: center; }
+        .location-sub { font-size: 0.8rem; color: #888; display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .area-badge { background: #331111; color: #ff4444; padding: 3px 8px; border-radius: 4px; font-weight: bold; }
+        
+        .guard-btn { width: 100%; padding: 10px; background: #222; border: 1px solid #444; color: #aaa; cursor: pointer; border-radius: 4px; font-weight: bold; }
+        .guard-btn:hover { background: #333; color: white; }
+        .active-guard-btn { background: linear-gradient(90deg, #FFD700, #B8860B); color: #220; border: none; }
+        
         .back-btn { display: block; margin: 30px auto; text-align: center; color: #888; text-decoration: none; border: 1px solid #444; padding: 10px; width: 150px; border-radius: 20px; }
+
+        /* MODAL STYLES */
+        .modal { display: none; position: fixed; z-index: 999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); align-items: center; justify-content: center; }
+        .modal-content { background: #1a1a1a; padding: 25px; border: 2px solid #C5A059; border-radius: 8px; width: 90%; max-width: 400px; color: white; text-align: center; }
+        .modal h2 { color: #C5A059; margin-top: 0; font-family: 'Cinzel', serif; }
+        .modal-stat { display: flex; justify-content: space-between; margin: 10px 0; border-bottom: 1px solid #333; padding-bottom: 5px; }
+        .range-wrap { margin: 20px 0; }
+        input[type=range] { width: 100%; }
+        .btn-confirm { background: #00e676; color: black; border: none; padding: 12px; width: 100%; font-weight: bold; cursor: pointer; border-radius: 4px; margin-top: 10px; font-size: 1.1rem; }
+        .btn-cancel { background: none; border: 1px solid #444; color: #888; padding: 10px; width: 100%; margin-top: 10px; cursor: pointer; border-radius: 4px; }
     </style>
 </head>
 <body>
@@ -28,25 +46,54 @@
         <h1>My Conquests</h1>
         <div class="stats-summary">
             <div class="stat-badge">Total: <span id="totalArea" class="highlight">0</span> m²</div>
-            <div class="stat-badge">Lands: <span id="totalCount" class="highlight">0</span></div>
+            <div class="stat-badge">Points: <span id="myPoints" class="highlight">0</span></div>
         </div>
     </div>
     <div id="landList" class="land-list"><p style="text-align:center; color:#666; margin-top:50px;">Consulting the archives...</p></div>
     <a href="dashboard.html" class="back-btn">← Back to Base</a>
 
+    <div id="guardModal" class="modal">
+        <div class="modal-content">
+            <h2>🛡️ Deploy Protection</h2>
+            <div class="modal-stat"><span>Territory Area:</span><span id="mArea">...</span></div>
+            <div class="modal-stat"><span>Required Guards:</span><span id="mReq" style="color:#FFD700">...</span></div>
+            <div class="modal-stat"><span>Cost Per Guard:</span><span>10 Pts</span></div>
+            
+            <div class="range-wrap">
+                <label>Guards to Deploy: <span id="mCountVal" style="font-weight:bold; font-size:1.2rem; color:#00e676;">1</span></label>
+                <input type="range" id="mRange" min="1" max="1" value="1" step="1">
+            </div>
+
+            <div style="background:#222; padding:10px; border-radius:4px; margin-bottom:10px;">
+                <div style="display:flex; justify-content:space-between;"><span>Total Cost:</span><span id="mCost" style="color:#ff4444; font-weight:bold;">10 Pts</span></div>
+                <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#888;"><span>Duration:</span><span>7 Days</span></div>
+            </div>
+
+            <button id="btnConfirm" class="btn-confirm">CONFIRM DEPLOYMENT</button>
+            <button class="btn-cancel" onclick="document.getElementById('guardModal').style.display='none'">Cancel</button>
+        </div>
+    </div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-        import { getDatabase, ref, get, child } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+        import { getDatabase, ref, get, child, update, onValue } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
         const firebaseConfig = { databaseURL: "https://runmate-cb328-default-rtdb.firebaseio.com/" };
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
         const currentUser = localStorage.getItem('currentUser');
-        
-        // INSERTED YOUR API KEY HERE
         const GOOGLE_API_KEY = "AIzaSyAzfoxuzRbmyrhGChfTEWB05xvyNRmvK3k"; 
 
         if (!currentUser) window.location.href = 'index.html';
+
+        let userPoints = 0;
+        let selectedLandId = null;
+
+        // Load Points
+        onValue(ref(db, `users/${currentUser}`), (snap) => {
+            userPoints = snap.val().creditPoints || 0;
+            document.getElementById('myPoints').innerText = userPoints;
+        });
 
         async function loadLands() {
             const listDiv = document.getElementById('landList');
@@ -55,29 +102,108 @@
                 const data = snapshot.val();
                 
                 if (!data) { listDiv.innerHTML = "<p style='text-align:center;'>You have not conquered any land yet.</p>"; return; }
-                const myLands = Object.values(data).filter(t => t.owner === currentUser).sort((a, b) => b.timestamp - a.timestamp);
+                const myLands = Object.entries(data).filter(([k, t]) => t.owner === currentUser).sort((a, b) => b[1].timestamp - a[1].timestamp);
 
                 let totalArea = 0;
-                myLands.forEach(l => totalArea += (l.areaSize || 0));
+                myLands.forEach(([k, l]) => totalArea += (l.areaSize || 0));
                 document.getElementById('totalArea').innerText = Math.round(totalArea).toLocaleString();
-                document.getElementById('totalCount').innerText = myLands.length;
 
                 if (myLands.length === 0) { listDiv.innerHTML = "<p style='text-align:center;'>You have not conquered any land yet.</p>"; return; }
 
                 listDiv.innerHTML = "";
-                for (const land of myLands) {
+                for (const [key, land] of myLands) {
                     const center = getPolygonCenter(land.coords);
-                    const card = document.createElement('div');
-                    card.className = 'land-card';
                     const pathStr = land.coords.map(c => `${c.lat},${c.lng}`).join('|');
                     const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=600x300&maptype=satellite&path=color:0x00e676|weight:2|fillcolor:0x00e67633|${pathStr}&key=${GOOGLE_API_KEY}`;
+                    
+                    // Guard Logic
+                    const isGuarded = land.guarded && land.guardExpiry && land.guardExpiry > Date.now();
+                    const timeLeft = isGuarded ? Math.ceil((land.guardExpiry - Date.now()) / (1000 * 60 * 60 * 24)) : 0;
+                    
+                    const card = document.createElement('div');
+                    card.className = `land-card ${isGuarded ? 'guarded-card' : ''}`;
 
-                    card.innerHTML = `<div class="map-snap"><img src="${mapUrl}" alt="Map"></div><div class="card-details"><div class="location-name" id="loc-${land.timestamp}">Loading Location...</div><div class="location-sub"><span>📅 ${new Date(land.timestamp).toLocaleDateString()}</span><span class="area-badge">${Math.round(land.areaSize)} m²</span></div></div>`;
+                    card.innerHTML = `
+                        <div class="map-snap"><img src="${mapUrl}" alt="Map"></div>
+                        <div class="card-details">
+                            <div class="location-name" id="loc-${land.timestamp}">Loading Location...</div>
+                            <div class="location-sub">
+                                <span>📅 ${new Date(land.timestamp).toLocaleDateString()}</span>
+                                <span class="area-badge">${Math.round(land.areaSize)} m²</span>
+                            </div>
+                            ${isGuarded 
+                                ? `<button class="guard-btn active-guard-btn">🛡️ PROTECTED (${timeLeft} Days Left)</button>` 
+                                : `<button class="guard-btn" onclick="window.openGuardModal('${key}', ${land.areaSize})">🛡️ DEPLOY GUARD</button>`
+                            }
+                        </div>`;
+                    
                     listDiv.appendChild(card);
                     fetchAddress(center.lat, center.lng, `loc-${land.timestamp}`);
                 }
             } catch (err) { console.error(err); listDiv.innerHTML = "<p style='text-align:center; color:red;'>Error loading archives.</p>"; }
         }
+
+        // --- MODAL LOGIC ---
+        window.openGuardModal = (landId, area) => {
+            selectedLandId = landId;
+            const requiredGuards = Math.ceil(area / 500);
+            
+            document.getElementById('mArea').innerText = Math.round(area) + " m²";
+            document.getElementById('mReq').innerText = requiredGuards;
+            
+            const range = document.getElementById('mRange');
+            range.max = requiredGuards;
+            range.value = requiredGuards; // Default to max
+            
+            updateModalCalc(requiredGuards);
+            document.getElementById('guardModal').style.display = 'flex';
+        };
+
+        const rangeInput = document.getElementById('mRange');
+        rangeInput.addEventListener('input', (e) => updateModalCalc(e.target.value));
+
+        function updateModalCalc(val) {
+            document.getElementById('mCountVal').innerText = val;
+            const cost = val * 10;
+            const costEl = document.getElementById('mCost');
+            costEl.innerText = cost + " Pts";
+            
+            const btn = document.getElementById('btnConfirm');
+            if (userPoints < cost) {
+                costEl.style.color = "red";
+                btn.disabled = true;
+                btn.innerText = "NOT ENOUGH POINTS";
+                btn.style.background = "#444";
+            } else {
+                costEl.style.color = "#00e676";
+                btn.disabled = false;
+                btn.innerText = "CONFIRM DEPLOYMENT";
+                btn.style.background = "#00e676";
+            }
+        }
+
+        document.getElementById('btnConfirm').addEventListener('click', async () => {
+            if (!selectedLandId) return;
+            const count = parseInt(document.getElementById('mRange').value);
+            const cost = count * 10;
+            
+            if (userPoints < cost) return alert("Insufficient points!");
+            
+            if(!confirm(`Deploy ${count} guards for ${cost} points?`)) return;
+
+            const updates = {};
+            updates[`users/${currentUser}/creditPoints`] = userPoints - cost;
+            updates[`territories/${selectedLandId}/guarded`] = true;
+            updates[`territories/${selectedLandId}/guardCount`] = count;
+            updates[`territories/${selectedLandId}/guardExpiry`] = Date.now() + (7 * 24 * 60 * 60 * 1000); // 7 Days from now
+
+            try {
+                await update(ref(db), updates);
+                alert("Guards Deployed Successfully!");
+                document.getElementById('guardModal').style.display = 'none';
+                loadLands(); // Refresh UI
+            } catch(e) { alert("Error: " + e.message); }
+        });
 
         function getPolygonCenter(coords) {
             let lat = 0, lng = 0;
@@ -94,6 +220,7 @@
                 document.getElementById(elementId).innerText = `${locName}, ${addr.state || ""}`;
             } catch (e) { document.getElementById(elementId).innerText = "Remote Territory"; }
         }
+        
         loadLands();
     </script>
 </body>

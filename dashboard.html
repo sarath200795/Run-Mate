@@ -29,8 +29,10 @@
         .clan-section { background: #111; padding: 25px; border: 1px solid #554422; border-radius: 8px; margin-bottom: 20px; text-align: center; }
         .btn-manage { background: #8B0000; color: white; width: 100%; padding: 15px; border: 1px solid #ff4444; cursor: pointer; font-family: 'Cinzel', serif; font-weight: bold; }
         .btn-play { width: 100%; padding: 20px; background: linear-gradient(180deg, #D4AF37 0%, #AA8A26 100%); color: #220; border: 1px solid #FFD700; font-family: 'Cinzel', serif; font-weight: bold; font-size: 1.3rem; cursor: pointer; margin-top: 10px; }
-        .btn-leaderboard { width: 100%; padding: 12px; background: #222; border: 1px solid #444; color: #aaa; margin-bottom: 15px; cursor: pointer; border-radius: 4px; font-weight: bold; }
-        .btn-leaderboard:hover { background: #333; color: white; border-color: #666; }
+        
+        .btn-nav { width: 100%; padding: 12px; background: #222; border: 1px solid #444; color: #aaa; margin-bottom: 10px; cursor: pointer; border-radius: 4px; font-weight: bold; }
+        .btn-nav:hover { background: #333; color: white; border-color: #666; }
+        .btn-guard-nav { border-color: #FFD700; color: #FFD700; background: rgba(255, 215, 0, 0.05); }
 
         .btn-accept-sm { background: #00e676; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-right: 10px; }
         .btn-decline-sm { background: #333; border: 1px solid #ff4444; color:#ff4444; padding: 8px 15px; border-radius: 4px; cursor: pointer; }
@@ -61,7 +63,8 @@
         </div>
     </div>
 
-    <button onclick="window.location.href='leaderboard.html'" class="btn-leaderboard">🏆 View Global Leaderboards</button>
+    <button onclick="window.location.href='personal_land.html'" class="btn-nav btn-guard-nav">🛡️ Manage Guards & Lands</button>
+    <button onclick="window.location.href='leaderboard.html'" class="btn-nav">🏆 View Global Leaderboards</button>
 
     <div id="clanControlPanel" class="clan-section" style="display:none;">
         <h3 id="myClanName" style="color:#C5A059; margin:0 0 10px 0; font-family:'Cinzel', serif;"></h3>
@@ -96,7 +99,6 @@
 
     window.logout = function() { if(confirm("Logout?")) { localStorage.clear(); window.location.href = 'index.html'; }};
 
-    // New Function to show streak details
     window.showStreakDetails = function() {
         alert(`🔥 Current Streak: ${currentStreakData} Days\n\nKeep conquering at least 100m² daily to maintain your streak and earn bonus points!`);
     };
@@ -120,7 +122,6 @@
         const user = snapshot.val();
         if(!user) return; 
 
-        // Update Points & Store Streak Data
         document.getElementById('creditPoints').innerText = user.creditPoints || 0;
         currentStreakData = user.streak || 0;
 
