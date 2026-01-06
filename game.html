@@ -8,34 +8,24 @@
     <style>
         html, body { height: 100%; margin: 0; padding: 0; background: #000; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
         #map { height: 100%; width: 100%; }
-        
         .sidebar { position: absolute; top: 0; left: 0; bottom: 0; width: 250px; background: rgba(20,20,20,0.95); border-right: 2px solid #8B0000; z-index: 400; transform: translateX(-100%); transition: 0.3s; color: white; padding-top: 10px; display:flex; flex-direction:column;}
         .sidebar.open { transform: translateX(0); }
         .menu-toggle { position: absolute; top: 10px; left: 10px; z-index: 401; background: #8B0000; color: white; padding: 8px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; border: 2px solid #ff4444; font-family: 'Cinzel', serif; }
-        
         .sb-header { text-align: center; padding: 10px; border-bottom: 1px solid #444; }
         .rank-badge { background: linear-gradient(135deg, #FFD700, #B8860B); color: black; padding: 5px; border-radius: 4px; font-weight: bold; display: inline-block; font-family: 'Cinzel', serif; margin-top:5px;}
-        
         .sb-stats { padding: 20px; text-align: center; }
         .sb-val { font-size: 1.4rem; color: #00e676; font-weight: bold; }
         .sb-sub { color:#aaa; font-size:0.8rem; margin-bottom: 15px; }
-
         .points-box { background: #111; border: 1px solid #C5A059; padding: 10px; margin: 10px; border-radius: 6px; }
         .points-val { color: #C5A059; font-size: 1.2rem; font-weight: bold; }
-
         .controls { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 400px; z-index: 300; display: flex; flex-direction: column; gap: 10px; }
         button { padding: 15px; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: bold; cursor: pointer; font-family: 'Cinzel', serif; text-transform: uppercase; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        
         #startBtn { background: linear-gradient(180deg, #00e676, #00c853); color: #003300; }
         #stopBtn { background: linear-gradient(180deg, #ff1744, #d50000); color: white; display: none; }
-        
         .toast { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); padding: 15px 25px; border-radius: 50px; color: white; font-weight: bold; border: 2px solid #ff4444; display: none; z-index: 500; text-align: center; white-space: nowrap; box-shadow: 0 0 20px rgba(255, 0, 0, 0.4); }
-
         .sb-clan { flex: 1; padding: 10px; overflow-y: auto; border-top: 1px solid #444; }
         .lb-item { display: flex; justify-content: space-between; padding: 5px; border-bottom: 1px solid #333; font-size: 0.85rem; }
         .logout-btn-sb { padding: 10px; border: 1px solid #ff4444; color: #ff4444; background: none; margin: 10px; cursor: pointer; }
-
-        /* MODAL STYLES */
         .modal { display: none; position: fixed; z-index: 999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); align-items: center; justify-content: center; }
         .modal-content { background: #1a1a1a; padding: 25px; border: 2px solid #C5A059; border-radius: 8px; width: 90%; max-width: 400px; color: white; text-align: center; position: relative; }
         .modal h2 { color: #C5A059; margin-top: 0; font-family: 'Cinzel', serif; }
@@ -80,20 +70,13 @@
         <div class="modal-content">
             <h2 id="mTitle">🛡️ Secure Territory</h2>
             <div id="mHelper" class="helper-text">...</div>
-            
             <div class="modal-stat"><span>Territory Area:</span><span id="mArea">...</span></div>
             <div class="modal-stat"><span>Guards Needed:</span><span id="mReq" style="color:#FFD700">...</span></div>
-            
-            <div class="range-wrap">
-                <label>Deploy Count: <span id="mCountVal" style="font-weight:bold; font-size:1.2rem; color:#00e676;">1</span></label>
-                <input type="range" id="mRange" min="1" max="1" value="1" step="1">
-            </div>
-
+            <div class="range-wrap"><label>Deploy Count: <span id="mCountVal" style="font-weight:bold; font-size:1.2rem; color:#00e676;">1</span></label><input type="range" id="mRange" min="1" max="1" value="1" step="1"></div>
             <div style="background:#222; padding:10px; border-radius:4px; margin-bottom:10px;">
                 <div style="display:flex; justify-content:space-between;"><span>Total Cost:</span><span id="mCost" style="color:#ff4444; font-weight:bold;">10 Pts</span></div>
                 <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#888;"><span>Duration:</span><span>7 Days</span></div>
             </div>
-
             <button id="btnConfirm" class="btn-confirm">DEPLOY GUARDS</button>
             <button class="btn-cancel" onclick="document.getElementById('guardModal').style.display='none'">Cancel</button>
         </div>
@@ -101,15 +84,15 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-        import { getDatabase, ref, push, update, onValue, get, child } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+        import { getDatabase, ref, push, update, onValue, get, child, runTransaction } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
         const firebaseConfig = { databaseURL: "https://runmate-cb328-default-rtdb.firebaseio.com/" };
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
         
         let map, userMarker, activePolyline, watchId, pathCoords = [];
-        let allPolygons = []; // Stores logic data (even invisible ones)
-        let visualPolygons = []; // Stores actual map objects
+        let allPolygons = []; 
+        let visualPolygons = []; 
         let lastKnownPos = null;
         
         const currentUser = localStorage.getItem('currentUser');
@@ -120,8 +103,6 @@
         let currentStreak = 0;
         let totalPoints = 0;
         let lastConquestDate = 0;
-        
-        // Guard Modal Logic Vars
         let selectedLandId = null;
 
         if(!currentUser) window.location.href = 'index.html';
@@ -152,10 +133,7 @@
                 zoom: 19, center: { lat: 0, lng: 0 }, mapTypeId: 'terrain', disableDefaultUI: true,
                 styles: [{ elementType: "geometry", stylers: [{ color: "#242f3e" }] }, { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] }, { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] }, { featureType: "road", elementType: "geometry", stylers: [{ color: "#38414e" }] }]
             });
-            
-            // Wait for user data (clan) before loading territories to ensure visibility logic works
             loadUserData();
-
             if (navigator.geolocation) {
                 navigator.geolocation.watchPosition(pos => {
                     const latLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
@@ -178,11 +156,9 @@
         function checkGuardProximity(pos) {
             if(!allPolygons.length || !pos) return;
             const pt = turf.point([pos.lng, pos.lat]);
-            
             for(const pData of allPolygons) {
                 if (turf.booleanPointInPolygon(pt, pData.polygon)) {
                     const t = pData.data;
-                    // Warning only if it's an active enemy guard
                     if (t.guarded && t.owner !== currentUser) {
                          if(!t.guardExpiry || t.guardExpiry > Date.now()) {
                             showToast("⛔ GUARD DETECTED! AREA SECURED", true);
@@ -201,15 +177,13 @@
                 currentStreak = u.streak || 0;
                 totalPoints = u.creditPoints || 0;
                 lastConquestDate = u.lastActiveDate || 0;
-
                 document.getElementById('sbPoints').innerText = totalPoints;
                 document.getElementById('sbStreak').innerText = currentStreak;
-
                 if(myClan) { 
                     document.getElementById('clanSection').style.display = 'block'; 
                     get(child(ref(db), `clans/${myClan}/members`)).then(mSnap => { 
                         myClanMembers = mSnap.val() || {}; 
-                        loadTerritories(); // Reload map after getting clan data
+                        loadTerritories(); 
                     });
                 } else {
                     myClanMembers = {};
@@ -238,8 +212,6 @@
             document.getElementById('clanLeaderboard').innerHTML = lb.slice(0, 10).map((p, i) => `<div class="lb-item"><span>#${i+1} ${p.name}</span><span style="color:#aaa;">${Math.round(p.score)}</span></div>`).join('');
         }
 
-        // --- MAP CLICK / MODAL LOGIC ---
-        
         const rangeInput = document.getElementById('mRange');
         rangeInput.addEventListener('input', (e) => updateModalCalc(e.target.value));
 
@@ -248,7 +220,6 @@
             const cost = val * 10;
             const costEl = document.getElementById('mCost');
             costEl.innerText = cost + " Pts";
-            
             const btn = document.getElementById('btnConfirm');
             if (totalPoints < cost) {
                 costEl.style.color = "red";
@@ -263,13 +234,10 @@
             }
         }
 
-        // Updated Modal Open Logic to handle Ally Difference
         window.openDeploymentModal = (landId, area, isAlly = false) => {
             selectedLandId = landId;
-            const coverage = isAlly ? 250 : 500; // Reduced efficiency for allies
+            const coverage = isAlly ? 250 : 500; 
             const requiredGuards = Math.ceil(area / coverage);
-            
-            // Update Text
             const titleEl = document.getElementById('mTitle');
             const helpEl = document.getElementById('mHelper');
             
@@ -283,11 +251,9 @@
 
             document.getElementById('mArea').innerText = Math.round(area) + " m²";
             document.getElementById('mReq').innerText = requiredGuards;
-            
             rangeInput.max = requiredGuards;
             rangeInput.min = 1;
             rangeInput.value = requiredGuards;
-            
             updateModalCalc(requiredGuards);
             document.getElementById('guardModal').style.display = 'flex';
         };
@@ -296,7 +262,6 @@
             if (!selectedLandId) return;
             const count = parseInt(rangeInput.value);
             const cost = count * 10;
-            
             if (totalPoints < cost) return alert("Insufficient points!");
             
             const updates = {};
@@ -311,9 +276,6 @@
                 document.getElementById('guardModal').style.display = 'none';
             } catch(e) { alert(e.message); }
         });
-
-
-        // --- MAIN GAMEPLAY LOGIC ---
 
         document.getElementById('startBtn').addEventListener('click', () => {
             if (!map) return alert("Map loading...");
@@ -361,32 +323,19 @@
 
                 for (const [key, t] of Object.entries(territories)) {
                     if(!t.coords || t.owner === currentUser) continue;
-                    
                     const tCoords = t.coords.map(c => [c.lng, c.lat]);
                     tCoords.push([t.coords[0].lng, t.coords[0].lat]);
                     const existingPoly = turf.polygon([tCoords]);
-
                     const intersection = turf.intersect(newPoly, existingPoly);
-                    
                     if (intersection) {
                         const overlapArea = turf.area(intersection);
                         if (overlapArea > 0) {
-                            
                             let isProtected = false;
                             if (t.guarded) {
-                                if (t.guardExpiry && t.guardExpiry > Date.now()) {
-                                    isProtected = true;
-                                } else {
-                                    updates[`territories/${key}/guarded`] = null; 
-                                }
+                                if (t.guardExpiry && t.guardExpiry > Date.now()) { isProtected = true; } 
+                                else { updates[`territories/${key}/guarded`] = null; }
                             }
-
-                            if (isProtected) {
-                                guardBlocked = true;
-                                finalMyArea -= overlapArea;
-                                continue;
-                            }
-                            
+                            if (isProtected) { guardBlocked = true; finalMyArea -= overlapArea; continue; }
                             const isAlly = myClanMembers[t.owner] ? true : false;
                             let currentEnemyArea = t.areaSize || 0;
                             if (isAlly) {
@@ -409,6 +358,27 @@
                     const newKey = push(ref(db, 'territories')).key;
                     updates[`territories/${newKey}`] = { owner: currentUser, coords: pathCoords, areaSize: finalMyArea, timestamp: Date.now() };
 
+                    // --- CLAN WAR SCORE UPDATE ---
+                    if(myClan) {
+                        const clanSnap = await get(ref(db, `clans/${myClan}`));
+                        if(clanSnap.val() && clanSnap.val().activeWar) {
+                             const warId = clanSnap.val().activeWar;
+                             // Transaction to ensure score is added correctly
+                             const warRef = ref(db, `clanWars/${warId}`);
+                             await runTransaction(warRef, (war) => {
+                                if (war) {
+                                    if (war.challenger === myClan) {
+                                        war.challengerScore = (war.challengerScore || 0) + finalMyArea;
+                                    } else if (war.defender === myClan) {
+                                        war.defenderScore = (war.defenderScore || 0) + finalMyArea;
+                                    }
+                                }
+                                return war;
+                             });
+                        }
+                    }
+
+                    // Credit Points & Streak
                     let pointMsg = "";
                     if (finalMyArea >= 100) {
                         const now = new Date();
@@ -416,7 +386,6 @@
                         const lastDate = lastConquestDate ? new Date(lastConquestDate) : null;
                         let newStreak = 1;
                         let pointsToAdd = 0;
-
                         if (!lastDate || lastDate.toDateString() !== todayStr) {
                              if (lastDate) {
                                 const oneDay = 24 * 60 * 60 * 1000;
@@ -427,10 +396,8 @@
                             }
                             pointsToAdd = calculateNewPoints(newStreak);
                         } else {
-                            newStreak = currentStreak; 
-                            pointMsg = "\n(Daily points already claimed)";
+                            newStreak = currentStreak; pointMsg = "\n(Daily points already claimed)";
                         }
-
                         if (pointsToAdd > 0) {
                             pointMsg = `\n+${pointsToAdd} Credit Points! (Streak: ${newStreak})`;
                             updates[`users/${currentUser}/creditPoints`] = totalPoints + pointsToAdd;
@@ -441,9 +408,7 @@
 
                     await update(ref(db), updates);
                     alert(`Conquest Complete!\nClaimed: ${Math.round(finalMyArea)} m²${stolenText}${pointMsg}`);
-                } else {
-                    alert("Area too small or blocked by guards.");
-                }
+                } else { alert("Area too small or blocked by guards."); }
 
             } catch(e) { console.error(e); alert("Error: " + e.message); }
 
@@ -451,58 +416,38 @@
             btn.innerText = "⚔️ Start Conquest"; btn.disabled = false;
         });
 
-        // --- RENDER VISIBILE POLYGONS ---
         function loadTerritories() {
             onValue(ref(db, 'territories'), (snapshot) => {
                 const data = snapshot.val();
-                
-                // 1. Clear existing visuals
-                visualPolygons.forEach(obj => {
-                    obj.poly.setMap(null);
-                    if(obj.marker) obj.marker.setMap(null);
-                });
+                visualPolygons.forEach(obj => { obj.poly.setMap(null); if(obj.marker) obj.marker.setMap(null); });
                 visualPolygons = [];
-                allPolygons = []; // Reset logic cache
-
+                allPolygons = []; 
                 loadStatsAndRank(data || {});
 
                 if (data) Object.entries(data).forEach(([key, t]) => { 
-                    
-                    // Logic: Add to allPolygons (Invisible or not, we need it for hit-tests)
                     const tCoords = t.coords.map(c => [c.lng, c.lat]);
                     tCoords.push([t.coords[0].lng, t.coords[0].lat]);
                     const turfPoly = turf.polygon([tCoords]);
                     allPolygons.push({ id: key, data: t, polygon: turfPoly });
 
-                    // Visibility Check: Mine OR Ally
                     const isMine = t.owner === currentUser;
                     const isAlly = myClan && myClanMembers[t.owner];
                     
                     if (isMine || isAlly) {
                         let isActiveGuard = t.guarded && (!t.guardExpiry || t.guardExpiry > Date.now());
-
                         let strokeC = isActiveGuard ? '#FFD700' : '#222';
                         let strokeW = isActiveGuard ? 3 : 1;
-                        let fillC = isMine ? '#00e676' : '#C5A059'; // Green or Gold
+                        let fillC = isMine ? '#00e676' : '#C5A059'; 
                         
                         const poly = new google.maps.Polygon({ 
-                            paths: t.coords, 
-                            fillColor: fillC, 
-                            fillOpacity: 0.25, 
-                            strokeColor: strokeC,
-                            strokeWeight: strokeW, 
-                            map: map,
-                            clickable: true, 
-                            zIndex: isActiveGuard ? 10 : 1
+                            paths: t.coords, fillColor: fillC, fillOpacity: 0.25, strokeColor: strokeC, strokeWeight: strokeW, map: map, clickable: true, zIndex: isActiveGuard ? 10 : 1
                         });
 
                         poly.addListener('click', () => {
-                            // Can guard Mine OR Ally
                             if (isActiveGuard) {
                                 const daysLeft = Math.ceil((t.guardExpiry - Date.now())/(1000*60*60*24));
                                 alert(`Protected.\nExpires in ${daysLeft} days.`);
                             } else {
-                                // Pass isAlly flag to modal (true if ally, false if mine)
                                 window.openDeploymentModal(key, t.areaSize || 0, !isMine);
                             }
                         });
@@ -511,12 +456,7 @@
                         if(isActiveGuard) {
                             const bounds = new google.maps.LatLngBounds();
                             t.coords.forEach(c => bounds.extend(c));
-                            marker = new google.maps.Marker({
-                                position: bounds.getCenter(),
-                                map: map,
-                                label: { text: "🛡️", fontSize: "16px" },
-                                icon: { path: google.maps.SymbolPath.CIRCLE, scale: 0 }
-                            });
+                            marker = new google.maps.Marker({ position: bounds.getCenter(), map: map, label: { text: "🛡️", fontSize: "16px" }, icon: { path: google.maps.SymbolPath.CIRCLE, scale: 0 } });
                         }
                         visualPolygons.push({ poly, marker });
                     }
