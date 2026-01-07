@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Personal War Records</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; margin: 0; padding: 20px; min-height: 100vh; }
+        .header { text-align: center; border-bottom: 2px solid #8B0000; padding-bottom: 20px; margin-bottom: 20px; }
+        h1 { margin: 0; font-family: 'Cinzel', serif; color: #ff4444; font-size: 1.8rem; letter-spacing: 1px; }
+
+        .tabs { display: flex; justify-content: center; background: #111; border-bottom: 1px solid #333; margin-bottom: 20px; }
+        .tab-btn { padding: 15px 25px; background: none; border: none; color: #888; cursor: pointer; font-weight: bold; font-family: 'Cinzel', serif; font-size: 1rem; flex: 1; max-width: 150px; }
+        .tab-btn.active { color: #C5A059; border-bottom: 3px solid #C5A059; background: #1a1a1a; }
+
+        .section { display: none; animation: fadein 0.3s; }
+        .section.active { display: block; }
+        @keyframes fadein { from {opacity:0} to {opacity:1} }
+
+        .war-card { background: #1a1a1a; border: 1px solid #333; border-radius: 8px; overflow: hidden; margin-bottom: 20px; }
+        .map-snap { width: 100%; height: 120px; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; border-bottom: 1px solid #333; }
+        .map-snap img { width: 100%; height: 100%; object-fit: cover; }
+        
+        .card-content { padding: 15px; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+        .enemy-name { color: #ff4444; font-weight: bold; font-size: 1.1rem; }
+        .area-lost { color: #C5A059; font-weight: bold; }
+        .date-text { font-size: 0.8rem; color: #666; }
+        .back-btn { display: block; margin: 30px auto; text-align: center; color: #888; text-decoration: none; border: 1px solid #444; padding: 10px; width: 150px; border-radius: 20px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Personal War Logs</h1>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('defense')">🛡️ Defense</button>
+        <button class="tab-btn" onclick="switchTab('attack')">⚔️ Attack</button>
+    </div>
+
+    <div id="defense" class="section active">
+        <div id="defenseList"><p style="text-align:center; color:#666;">Loading Defense Logs...</p></div>
+    </div>
+
+    <div id="attack" class="section">
+        <div id="attackList"><p style="text-align:center; color:#666;">Loading Attack Logs...</p></div>
+    </div>
+
+    <a href="dashboard.html" class="back-btn">← Back to Base</a>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+
+        const firebaseConfig = { databaseURL: "https://runmate-cb328-default-rtdb.firebaseio.com/" };
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const currentUser = localStorage.getItem('currentUser');
+        const GOOGLE_API_KEY = "AIzaSyAzfoxuzRbmyrhGChfTEWB05xvyNRmvK3k"; 
+
+        if (!currentUser) window.location.href = 'index.html';
+
+        window.switchTab = (tab) => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(tab).classList.add('active');
+        };
+
+        const defRef = ref(db, `userBattleLogs/${currentUser}/defense`);
+        const attRef = ref(db, `userBattleLogs/${currentUser}/attacks`);
+
+        onValue(defRef, (snap) => renderLogs(snap.val(), 'defenseList', true));
+        onValue(attRef, (snap) => renderLogs(snap.val(), 'attackList', false));
+
+        function renderLogs(data, elementId, isDefense) {
+            const list = document.getElementById(elementId);
+            if (!data) { list.innerHTML = "<p style='text-align:center; color:#444;'>No records found.</p>"; return; }
+            
+            const entries = Object.values(data).sort((a,b) => b.timestamp - a.timestamp);
+            
+            list.innerHTML = entries.map(log => {
+                // Construct Static Map URL for the Intersection (The Cut)
+                const pathStr = log.coords.map(c => `${c.lat},${c.lng}`).join('|');
+                // Center map roughly
+                const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?size=600x300&maptype=satellite&path=color:0xff0000|weight:2|fillcolor:0xff000044|${pathStr}&key=${GOOGLE_API_KEY}`;
+                
+                const targetUser = isDefense ? log.attacker : log.defender;
+                const actionText = isDefense ? "SEIZED FROM YOU" : "CAPTURED BY YOU";
+                const colorClass = isDefense ? "#ff4444" : "#00e676";
+
+                return `
+                <div class="war-card">
+                    <div class="map-snap"><img src="${mapUrl}" alt="Conflict Zone"></div>
+                    <div class="card-content">
+                        <div class="card-header">
+                            <span class="enemy-name" style="color:${colorClass}">${targetUser}</span>
+                            <span class="area-lost">${Math.round(log.area)} m²</span>
+                        </div>
+                        <div style="font-size:0.9rem; font-weight:bold; color:#aaa; margin-bottom:5px;">${actionText}</div>
+                        <div class="date-text">📅 ${new Date(log.timestamp).toLocaleString()}</div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+    </script>
+</body>
+</html>

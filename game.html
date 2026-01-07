@@ -327,6 +327,7 @@
                     tCoords.push([t.coords[0].lng, t.coords[0].lat]);
                     const existingPoly = turf.polygon([tCoords]);
                     const intersection = turf.intersect(newPoly, existingPoly);
+                    
                     if (intersection) {
                         const overlapArea = turf.area(intersection);
                         if (overlapArea > 0) {
@@ -336,17 +337,41 @@
                                 else { updates[`territories/${key}/guarded`] = null; }
                             }
                             if (isProtected) { guardBlocked = true; finalMyArea -= overlapArea; continue; }
+                            
                             const isAlly = myClanMembers[t.owner] ? true : false;
                             let currentEnemyArea = t.areaSize || 0;
+                            
+                            // VISUALIZE THE CUT (Intersection)
+                            const intersectCoords = intersection.geometry.coordinates[0].map(c => ({ lat: c[1], lng: c[0] }));
+                            new google.maps.Polygon({ paths: intersectCoords, fillColor: "#ff0000", fillOpacity: 0.6, strokeColor: "#ff0000", strokeWeight: 2, map: map });
+
                             if (isAlly) {
                                 let newEnemyArea = Math.max(0, currentEnemyArea - (overlapArea / 2));
                                 updates[`territories/${key}/areaSize`] = newEnemyArea;
                                 finalMyArea -= (overlapArea / 2);
                                 stolenText += `\nShared ${Math.round(overlapArea)}m² with ally ${t.owner}`;
                             } else {
+                                // --- ENEMY LOGIC ---
+                                // 1. Subtract overlap from enemy
                                 let newEnemyArea = Math.max(0, currentEnemyArea - overlapArea);
                                 updates[`territories/${key}/areaSize`] = newEnemyArea;
                                 stolenText += `\nSeized ${Math.round(overlapArea)}m² from ${t.owner}`;
+                                
+                                // 2. LOG THE ATTACK FOR PERSONAL WAR PAGE
+                                const timestamp = Date.now();
+                                const battleLog = {
+                                    attacker: currentUser,
+                                    defender: t.owner,
+                                    area: overlapArea,
+                                    coords: intersectCoords,
+                                    timestamp: timestamp,
+                                    locName: "Unknown Wilderness" // Can be updated by reverse geocoding later if needed
+                                };
+
+                                // Save log to Attacker (Attack Tab)
+                                updates[`userBattleLogs/${currentUser}/attacks/${timestamp}`] = battleLog;
+                                // Save log to Defender (Defense Tab)
+                                updates[`userBattleLogs/${t.owner}/defense/${timestamp}`] = battleLog;
                             }
                         }
                     }
@@ -363,7 +388,6 @@
                         const clanSnap = await get(ref(db, `clans/${myClan}`));
                         if(clanSnap.val() && clanSnap.val().activeWar) {
                              const warId = clanSnap.val().activeWar;
-                             // Transaction to ensure score is added correctly
                              const warRef = ref(db, `clanWars/${warId}`);
                              await runTransaction(warRef, (war) => {
                                 if (war) {
@@ -378,7 +402,7 @@
                         }
                     }
 
-                    // Credit Points & Streak
+                    // Credit Points & Streak Logic
                     let pointMsg = "";
                     if (finalMyArea >= 100) {
                         const now = new Date();
