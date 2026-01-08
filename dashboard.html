@@ -20,6 +20,10 @@
         .points-card { grid-column: span 2; border: 1px solid #FFD700; background: linear-gradient(90deg, #222 0%, #333 100%); cursor: pointer; transition: transform 0.1s; }
         .points-card:active { transform: scale(0.98); }
         .points-header { color: #FFD700; font-family: 'Cinzel', serif; margin-bottom: 5px; }
+        
+        .bank-card { grid-column: span 2; border: 1px solid #C5A059; background: #1a0f00; display: flex; justify-content: space-between; align-items: center; padding: 15px; }
+        .btn-redeem { background: #C5A059; color: black; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold; cursor: pointer; }
+
         .clan-section { background: #111; padding: 25px; border: 1px solid #554422; border-radius: 8px; margin-bottom: 20px; text-align: center; }
         .btn-manage { background: #8B0000; color: white; width: 100%; padding: 15px; border: 1px solid #ff4444; cursor: pointer; font-family: 'Cinzel', serif; font-weight: bold; }
         .btn-play { width: 100%; padding: 20px; background: linear-gradient(180deg, #D4AF37 0%, #AA8A26 100%); color: #220; border: 1px solid #FFD700; font-family: 'Cinzel', serif; font-weight: bold; font-size: 1.3rem; cursor: pointer; margin-top: 10px; }
@@ -43,6 +47,15 @@
             <span class="stat-val" id="creditPoints" style="color:#FFD700">0</span>
             <div style="font-size:0.7rem; color:#aaa; margin-top:5px;">(Click for Streak Info)</div>
         </div>
+        
+        <div class="stat-box bank-card">
+            <div style="text-align:left;">
+                <div style="color:#C5A059; font-weight:bold; font-size:0.9rem;">BANKED LAND</div>
+                <div id="bankedAreaDisplay" style="color:white; font-size:1.3rem; font-weight:bold;">0 m²</div>
+            </div>
+            <button class="btn-redeem" onclick="window.location.href='land_market.html'">Redeem</button>
+        </div>
+
         <div class="stat-box clickable-stat" onclick="window.location.href='personal_land.html'">
             <span class="stat-val" id="myArea">0 m²</span><div style="font-size:0.7rem; color:#888;">Personal Land (View)</div>
         </div>
@@ -112,6 +125,7 @@
         if(!user) return; 
 
         document.getElementById('creditPoints').innerText = user.creditPoints || 0;
+        document.getElementById('bankedAreaDisplay').innerText = Math.round(user.bankedArea || 0) + " m²";
         currentStreakData = user.streak || 0;
 
         const panel = document.getElementById('invitesPanel');

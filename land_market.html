@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Land Market</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { margin: 0; padding: 0; background: #000; font-family: 'Segoe UI', sans-serif; height: 100vh; display: flex; flex-direction: column; }
+        .header { background: #111; padding: 15px; border-bottom: 2px solid #C5A059; text-align: center; color: white; display:flex; justify-content:space-between; align-items:center; }
+        .bank-display { color: #FFD700; font-weight: bold; font-size: 1.1rem; border: 1px solid #C5A059; padding: 5px 10px; border-radius: 4px; }
+        #map { flex: 1; position: relative; }
+        .crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; pointer-events: none; z-index: 10; opacity: 0.8; }
+        .controls { padding: 15px; background: #111; border-top: 1px solid #333; text-align: center; }
+        .btn-claim { background: #C5A059; color: black; border: none; padding: 15px 30px; font-weight: bold; font-family: 'Cinzel', serif; font-size: 1.1rem; border-radius: 4px; cursor: pointer; width: 100%; max-width: 300px; }
+        .btn-back { background: none; border: 1px solid #555; color: #888; padding: 5px 10px; font-size: 0.8rem; cursor: pointer; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <button class="btn-back" onclick="window.location.href='dashboard.html'">Back</button>
+        <div class="bank-display">Banked: <span id="bankVal">0</span> m²</div>
+        <div style="width:50px;"></div> 
+    </div>
+
+    <div id="map">
+        <svg class="crosshair" viewBox="0 0 100 100">
+            <line x1="50" y1="0" x2="50" y2="100" stroke="#FFD700" stroke-width="2" />
+            <line x1="0" y1="50" x2="100" y2="50" stroke="#FFD700" stroke-width="2" />
+            <circle cx="50" cy="50" r="40" stroke="#FFD700" stroke-width="2" fill="none" />
+        </svg>
+    </div>
+
+    <div class="controls">
+        <div style="color:#888; font-size:0.9rem; margin-bottom:10px;">Drag map to position target</div>
+        <button class="btn-claim" id="btnClaim">CLAIM THIS SPOT</button>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+        import { getDatabase, ref, push, update, onValue, get } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+
+        const firebaseConfig = { databaseURL: "https://runmate-cb328-default-rtdb.firebaseio.com/" };
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const currentUser = localStorage.getItem('currentUser');
+        const GOOGLE_API_KEY = "AIzaSyAzfoxuzRbmyrhGChfTEWB05xvyNRmvK3k"; 
+
+        if (!currentUser) window.location.href = 'index.html';
+
+        let map, bankAmount = 0;
+        let allPolygons = []; // To check collisions
+
+        window.initMap = function() {
+            map = new google.maps.Map(document.getElementById("map"), {
+                zoom: 18, center: { lat: 0, lng: 0 }, mapTypeId: 'satellite', disableDefaultUI: true
+            });
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(pos => {
+                    map.setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                });
+            }
+
+            loadUserData();
+            loadExistingLands();
+        };
+
+        function loadUserData() {
+            onValue(ref(db, `users/${currentUser}`), (snap) => {
+                bankAmount = snap.val().bankedArea || 0;
+                document.getElementById('bankVal').innerText = Math.round(bankAmount);
+                if(bankAmount < 5) {
+                    document.getElementById('btnClaim').disabled = true;
+                    document.getElementById('btnClaim').style.background = "#333";
+                    document.getElementById('btnClaim').innerText = "Insufficient Banked Area";
+                }
+            });
+        }
+
+        function loadExistingLands() {
+            onValue(ref(db, 'territories'), (snapshot) => {
+                const data = snapshot.val();
+                // Clear old (not strictly needed for static map interaction but good practice)
+                allPolygons.forEach(p => p.setMap(null));
+                allPolygons = [];
+
+                if (data) Object.values(data).forEach(t => {
+                    const poly = new google.maps.Polygon({
+                        paths: t.coords,
+                        fillColor: "#555", fillOpacity: 0.3, strokeColor: "#888", strokeWeight: 1,
+                        map: map, clickable: false
+                    });
+                    // Store turf polygon for collision check
+                    const tCoords = t.coords.map(c => [c.lng, c.lat]);
+                    tCoords.push([t.coords[0].lng, t.coords[0].lat]);
+                    allPolygons.push({ 
+                        turfPoly: turf.polygon([tCoords]), 
+                        data: t 
+                    });
+                });
+            });
+        }
+
+        document.getElementById('btnClaim').addEventListener('click', async () => {
+            if(bankAmount < 5) return;
+            const center = map.getCenter();
+            const lat = center.lat();
+            const lng = center.lng();
+
+            // 1. Generate Circle Polygon Coords
+            // Area = pi * r^2  => r = sqrt(Area / pi)
+            const radiusMeters = Math.sqrt(bankAmount / Math.PI);
+            const circleCoords = generateCircleCoords(lat, lng, radiusMeters);
+
+            // 2. Create Turf Object for New Land
+            const turfCoords = circleCoords.map(c => [c.lng, c.lat]);
+            turfCoords.push([circleCoords[0].lng, circleCoords[0].lat]); // Close loop
+            const newPoly = turf.polygon([turfCoords]);
+
+            // 3. Collision Check
+            let collision = false;
+            let guardBlocked = false;
+
+            for(const existing of allPolygons) {
+                if (turf.intersect(newPoly, existing.turfPoly)) {
+                    // Simple logic: Can't place banked land on top of ANY existing land (yours or others)
+                    // Use standard Game mode for complex stealing. Market is for empty space.
+                    alert("Cannot place land here! Territory overlaps with existing land.");
+                    return;
+                }
+            }
+
+            if(!confirm(`Claim this location for ${Math.round(bankAmount)} m²?`)) return;
+
+            // 4. Save
+            const updates = {};
+            const newKey = push(ref(db, 'territories')).key;
+            updates[`territories/${newKey}`] = {
+                owner: currentUser,
+                coords: circleCoords,
+                areaSize: bankAmount,
+                timestamp: Date.now()
+            };
+            updates[`users/${currentUser}/bankedArea`] = 0; // Spend all
+            
+            // Add to total conquest stats
+            const userSnap = await get(ref(db, `users/${currentUser}`));
+            const currentTotal = userSnap.val().totalArea || 0; // Not actively used in display but good to have
+            
+            // Note: We don't add credit points here, assuming user got points for walking already? 
+            // Or we can add standard conquest points. Let's add standard points.
+            const currentPoints = userSnap.val().creditPoints || 0;
+            const pointsToAdd = 10; // Flat bonus for redeeming
+            updates[`users/${currentUser}/creditPoints`] = currentPoints + pointsToAdd;
+
+            try {
+                await update(ref(db), updates);
+                alert("Territory Claimed Successfully!");
+                window.location.href = 'dashboard.html';
+            } catch(e) { alert("Error: " + e.message); }
+        });
+
+        function generateCircleCoords(lat, lng, radius) {
+            const points = 32;
+            const coords = [];
+            for (let i = 0; i < points; i++) {
+                const theta = (i / points) * (2 * Math.PI);
+                const offset = google.maps.geometry.spherical.computeOffset(
+                    new google.maps.LatLng(lat, lng), 
+                    radius, 
+                    (theta * 180) / Math.PI
+                );
+                coords.push({ lat: offset.lat(), lng: offset.lng() });
+            }
+            return coords;
+        }
+    </script>
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAzfoxuzRbmyrhGChfTEWB05xvyNRmvK3k&libraries=geometry&callback=initMap"></script>
+</body>
+</html>

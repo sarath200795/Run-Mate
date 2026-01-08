@@ -26,6 +26,13 @@
         .sb-clan { flex: 1; padding: 10px; overflow-y: auto; border-top: 1px solid #444; }
         .lb-item { display: flex; justify-content: space-between; padding: 5px; border-bottom: 1px solid #333; font-size: 0.85rem; }
         .logout-btn-sb { padding: 10px; border: 1px solid #ff4444; color: #ff4444; background: none; margin: 10px; cursor: pointer; }
+        
+        /* MODE SWITCH STYLES */
+        .mode-switch-container { position: absolute; top: 10px; right: 10px; z-index: 401; background: rgba(0,0,0,0.8); padding: 5px; border-radius: 20px; border: 1px solid #C5A059; display: flex; gap: 5px; }
+        .mode-btn { padding: 8px 15px; border-radius: 15px; border: none; cursor: pointer; font-weight: bold; color: #aaa; background: none; font-size: 0.8rem; }
+        .mode-btn.active { background: #C5A059; color: black; }
+        .indoor-stats { position: absolute; top: 60px; right: 10px; z-index: 400; background: rgba(0,0,0,0.8); color: #00e676; padding: 10px; border-radius: 8px; border: 1px solid #00e676; display: none; text-align: right; }
+
         .modal { display: none; position: fixed; z-index: 999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); align-items: center; justify-content: center; }
         .modal-content { background: #1a1a1a; padding: 25px; border: 2px solid #C5A059; border-radius: 8px; width: 90%; max-width: 400px; color: white; text-align: center; position: relative; }
         .modal h2 { color: #C5A059; margin-top: 0; font-family: 'Cinzel', serif; }
@@ -39,6 +46,19 @@
 </head>
 <body>
     <div class="menu-toggle" id="menuBtn">☰ STATS</div>
+    
+    <div class="mode-switch-container">
+        <button class="mode-btn active" id="btnModeOut" onclick="window.setMode('outdoor')">🏹 OUTDOOR</button>
+        <button class="mode-btn" id="btnModeIn" onclick="window.setMode('indoor')">🏃 INDOOR</button>
+    </div>
+
+    <div id="indoorStatsPanel" class="indoor-stats">
+        <div style="font-size:0.8rem; color:#aaa;">DISTANCE</div>
+        <div style="font-size:1.2rem; font-weight:bold;" id="indDist">0 m</div>
+        <div style="font-size:0.8rem; color:#aaa; margin-top:5px;">BANKABLE AREA</div>
+        <div style="font-size:1.2rem; font-weight:bold; color:#FFD700;" id="indArea">0 m²</div>
+    </div>
+
     <div id="toast" class="toast">⚠️ WARNING</div>
 
     <div class="sidebar" id="sidebar">
@@ -58,7 +78,7 @@
     <div id="map"></div>
     
     <div class="controls">
-        <div style="background:rgba(0,0,0,0.7); padding:10px; border-radius:8px; margin-bottom:10px; text-align:center; color:#ccc; font-size:0.9rem;">
+        <div id="modeHelper" style="background:rgba(0,0,0,0.7); padding:10px; border-radius:8px; margin-bottom:10px; text-align:center; color:#ccc; font-size:0.9rem;">
             💡 Tap Green/Gold territories to deploy guards
         </div>
         <button id="startBtn">⚔️ Start Conquest</button>
@@ -94,14 +114,17 @@
         let allPolygons = []; 
         let visualPolygons = []; 
         let lastKnownPos = null;
+        let gameMode = 'outdoor'; // 'outdoor' or 'indoor'
+        let indoorDistance = 0;
+        let lastIndoorPos = null;
         
         const currentUser = localStorage.getItem('currentUser');
         const userIcon = localStorage.getItem('userIcon') || "👤";
         let myClan = null;
         let myClanMembers = {};
-        
         let currentStreak = 0;
         let totalPoints = 0;
+        let bankedArea = 0;
         let lastConquestDate = 0;
         let selectedLandId = null;
 
@@ -111,6 +134,25 @@
 
         window.logout = function() { if(confirm("Logout?")) { localStorage.clear(); window.location.href = 'index.html'; }};
         
+        window.setMode = (mode) => {
+            if(document.getElementById('stopBtn').style.display === 'block') return alert("Stop current session first!");
+            gameMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            if(mode === 'outdoor') {
+                document.getElementById('btnModeOut').classList.add('active');
+                document.getElementById('indoorStatsPanel').style.display = 'none';
+                document.getElementById('modeHelper').innerText = "💡 Tap Green/Gold territories to deploy guards";
+                document.getElementById('startBtn').innerText = "⚔️ Start Conquest";
+                document.getElementById('stopBtn').innerText = "🚩 Claim Territory";
+            } else {
+                document.getElementById('btnModeIn').classList.add('active');
+                document.getElementById('indoorStatsPanel').style.display = 'block';
+                document.getElementById('modeHelper').innerText = "🏃 Walk to bank area. Redeem later in Market.";
+                document.getElementById('startBtn').innerText = "🏃 Start Training";
+                document.getElementById('stopBtn').innerText = "💾 Bank Area";
+            }
+        };
+
         function showToast(msg, isBad=false) {
             const t = document.getElementById('toast');
             t.innerText = msg;
@@ -139,7 +181,7 @@
                     const latLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                     lastKnownPos = latLng;
                     updateUserMarker(latLng);
-                    checkGuardProximity(latLng);
+                    if(gameMode === 'outdoor') checkGuardProximity(latLng);
                 }, err => console.error(err), { enableHighAccuracy: true });
             }
         };
@@ -176,9 +218,11 @@
                 myClan = u.clan || null;
                 currentStreak = u.streak || 0;
                 totalPoints = u.creditPoints || 0;
+                bankedArea = u.bankedArea || 0;
                 lastConquestDate = u.lastActiveDate || 0;
                 document.getElementById('sbPoints').innerText = totalPoints;
                 document.getElementById('sbStreak').innerText = currentStreak;
+                
                 if(myClan) { 
                     document.getElementById('clanSection').style.display = 'block'; 
                     get(child(ref(db), `clans/${myClan}/members`)).then(mSnap => { 
@@ -279,14 +323,46 @@
 
         document.getElementById('startBtn').addEventListener('click', () => {
             if (!map) return alert("Map loading...");
-            pathCoords = []; activePolyline = new google.maps.Polyline({ path: [], strokeColor: "#FFFF00", strokeWeight: 6, map: map });
-            document.getElementById('startBtn').style.display = 'none'; document.getElementById('stopBtn').style.display = 'block';
+            pathCoords = []; 
+            document.getElementById('startBtn').style.display = 'none'; 
+            document.getElementById('stopBtn').style.display = 'block';
             
-            watchId = navigator.geolocation.watchPosition(pos => {
-                const latLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                pathCoords.push(latLng); activePolyline.getPath().push(new google.maps.LatLng(latLng.lat, latLng.lng));
-                map.panTo(latLng); updateUserMarker(latLng);
-            }, err => console.error(err), { enableHighAccuracy: true });
+            if (gameMode === 'outdoor') {
+                activePolyline = new google.maps.Polyline({ path: [], strokeColor: "#FFFF00", strokeWeight: 6, map: map });
+                watchId = navigator.geolocation.watchPosition(pos => {
+                    const latLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                    pathCoords.push(latLng); activePolyline.getPath().push(new google.maps.LatLng(latLng.lat, latLng.lng));
+                    map.panTo(latLng); updateUserMarker(latLng);
+                }, err => console.error(err), { enableHighAccuracy: true });
+            } else {
+                // INDOOR MODE
+                indoorDistance = 0;
+                lastIndoorPos = null;
+                document.getElementById('indDist').innerText = "0 m";
+                document.getElementById('indArea').innerText = "0 m²";
+                
+                watchId = navigator.geolocation.watchPosition(pos => {
+                    const latLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                    if (lastIndoorPos) {
+                        const from = new google.maps.LatLng(lastIndoorPos.lat, lastIndoorPos.lng);
+                        const to = new google.maps.LatLng(latLng.lat, latLng.lng);
+                        const dist = google.maps.geometry.spherical.computeDistanceBetween(from, to);
+                        
+                        // Filter GPS jitter
+                        if (dist > 1 && dist < 50) { 
+                            indoorDistance += dist;
+                            // Circumference = Distance. Radius = C / 2pi. Area = pi * r^2
+                            const r = indoorDistance / (2 * Math.PI);
+                            const area = Math.PI * r * r;
+                            
+                            document.getElementById('indDist').innerText = Math.round(indoorDistance) + " m";
+                            document.getElementById('indArea').innerText = Math.round(area) + " m²";
+                        }
+                    }
+                    lastIndoorPos = latLng;
+                    map.panTo(latLng); updateUserMarker(latLng);
+                }, err => console.error(err), { enableHighAccuracy: true });
+            }
         });
 
         function calculateNewPoints(streakDay) {
@@ -302,6 +378,25 @@
         document.getElementById('stopBtn').addEventListener('click', async () => {
             navigator.geolocation.clearWatch(watchId);
             document.getElementById('startBtn').style.display = 'block'; document.getElementById('stopBtn').style.display = 'none';
+            
+            if (gameMode === 'indoor') {
+                const r = indoorDistance / (2 * Math.PI);
+                const finalArea = Math.PI * r * r;
+                
+                if (finalArea < 5) return alert("Walk more! Distance too short.");
+
+                // BANK THE AREA
+                const updates = {};
+                updates[`users/${currentUser}/bankedArea`] = (bankedArea || 0) + finalArea;
+                
+                try {
+                    await update(ref(db), updates);
+                    alert(`Training Complete!\nBanked: ${Math.round(finalArea)} m².\nGo to Dashboard > Land Market to redeem.`);
+                } catch(e) { alert("Error saving: " + e.message); }
+                return;
+            }
+
+            // OUTDOOR LOGIC (EXISTING)
             if (pathCoords.length < 3) { activePolyline.setMap(null); return alert("Path too short."); }
 
             const turfCoords = pathCoords.map(p => [p.lng, p.lat]);
@@ -340,9 +435,9 @@
                             
                             const isAlly = myClanMembers[t.owner] ? true : false;
                             let currentEnemyArea = t.areaSize || 0;
-                            
-                            // VISUALIZE THE CUT (Intersection)
                             const intersectCoords = intersection.geometry.coordinates[0].map(c => ({ lat: c[1], lng: c[0] }));
+                            
+                            // Visual feedback
                             new google.maps.Polygon({ paths: intersectCoords, fillColor: "#ff0000", fillOpacity: 0.6, strokeColor: "#ff0000", strokeWeight: 2, map: map });
 
                             if (isAlly) {
@@ -351,13 +446,10 @@
                                 finalMyArea -= (overlapArea / 2);
                                 stolenText += `\nShared ${Math.round(overlapArea)}m² with ally ${t.owner}`;
                             } else {
-                                // --- ENEMY LOGIC ---
-                                // 1. Subtract overlap from enemy
                                 let newEnemyArea = Math.max(0, currentEnemyArea - overlapArea);
                                 updates[`territories/${key}/areaSize`] = newEnemyArea;
                                 stolenText += `\nSeized ${Math.round(overlapArea)}m² from ${t.owner}`;
                                 
-                                // 2. LOG THE ATTACK FOR PERSONAL WAR PAGE
                                 const timestamp = Date.now();
                                 const battleLog = {
                                     attacker: currentUser,
@@ -365,12 +457,9 @@
                                     area: overlapArea,
                                     coords: intersectCoords,
                                     timestamp: timestamp,
-                                    locName: "Unknown Wilderness" // Can be updated by reverse geocoding later if needed
+                                    locName: "Unknown Wilderness"
                                 };
-
-                                // Save log to Attacker (Attack Tab)
                                 updates[`userBattleLogs/${currentUser}/attacks/${timestamp}`] = battleLog;
-                                // Save log to Defender (Defense Tab)
                                 updates[`userBattleLogs/${t.owner}/defense/${timestamp}`] = battleLog;
                             }
                         }
@@ -383,7 +472,7 @@
                     const newKey = push(ref(db, 'territories')).key;
                     updates[`territories/${newKey}`] = { owner: currentUser, coords: pathCoords, areaSize: finalMyArea, timestamp: Date.now() };
 
-                    // --- CLAN WAR SCORE UPDATE ---
+                    // CLAN WAR SCORE
                     if(myClan) {
                         const clanSnap = await get(ref(db, `clans/${myClan}`));
                         if(clanSnap.val() && clanSnap.val().activeWar) {
@@ -402,7 +491,7 @@
                         }
                     }
 
-                    // Credit Points & Streak Logic
+                    // POINTS
                     let pointMsg = "";
                     if (finalMyArea >= 100) {
                         const now = new Date();
