@@ -14,6 +14,9 @@
         .controls { padding: 15px; background: #111; border-top: 1px solid #333; text-align: center; }
         .btn-claim { background: #C5A059; color: black; border: none; padding: 15px 30px; font-weight: bold; font-family: 'Cinzel', serif; font-size: 1.1rem; border-radius: 4px; cursor: pointer; width: 100%; max-width: 300px; }
         .btn-back { background: none; border: 1px solid #555; color: #888; padding: 5px 10px; font-size: 0.8rem; cursor: pointer; border-radius: 4px; }
+        .legend { position: absolute; bottom: 140px; left: 10px; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 4px; font-size: 0.8rem; color: #ccc; pointer-events: none; }
+        .legend-item { display: flex; align-items: center; margin-bottom: 5px; }
+        .color-box { width: 15px; height: 15px; margin-right: 8px; border: 1px solid #fff; }
     </style>
 </head>
 <body>
@@ -24,6 +27,10 @@
     </div>
 
     <div id="map">
+        <div class="legend">
+            <div class="legend-item"><div class="color-box" style="background:#00e676; opacity:0.4;"></div>Your Land</div>
+            <div class="legend-item"><div class="color-box" style="background:#888; opacity:0.4;"></div>Enemy Land</div>
+        </div>
         <svg class="crosshair" viewBox="0 0 100 100">
             <line x1="50" y1="0" x2="50" y2="100" stroke="#FFD700" stroke-width="2" />
             <line x1="0" y1="50" x2="100" y2="50" stroke="#FFD700" stroke-width="2" />
@@ -32,7 +39,7 @@
     </div>
 
     <div class="controls">
-        <div style="color:#888; font-size:0.9rem; margin-bottom:10px;">Drag map to position target</div>
+        <div style="color:#888; font-size:0.9rem; margin-bottom:10px;">Drag map to position target (Must be empty space)</div>
         <button class="btn-claim" id="btnClaim">CLAIM THIS SPOT</button>
     </div>
 
@@ -44,12 +51,11 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
         const currentUser = localStorage.getItem('currentUser');
-        const GOOGLE_API_KEY = "AIzaSyAzfoxuzRbmyrhGChfTEWB05xvyNRmvK3k"; 
 
         if (!currentUser) window.location.href = 'index.html';
 
         let map, bankAmount = 0;
-        let allPolygons = []; // To check collisions
+        let allPolygons = []; 
 
         window.initMap = function() {
             map = new google.maps.Map(document.getElementById("map"), {
@@ -70,10 +76,15 @@
             onValue(ref(db, `users/${currentUser}`), (snap) => {
                 bankAmount = snap.val().bankedArea || 0;
                 document.getElementById('bankVal').innerText = Math.round(bankAmount);
+                const btn = document.getElementById('btnClaim');
                 if(bankAmount < 5) {
-                    document.getElementById('btnClaim').disabled = true;
-                    document.getElementById('btnClaim').style.background = "#333";
-                    document.getElementById('btnClaim').innerText = "Insufficient Banked Area";
+                    btn.disabled = true;
+                    btn.style.background = "#333";
+                    btn.innerText = "Insufficient Banked Area";
+                } else {
+                    btn.disabled = false;
+                    btn.style.background = "#C5A059";
+                    btn.innerText = "CLAIM THIS SPOT";
                 }
             });
         }
@@ -81,22 +92,30 @@
         function loadExistingLands() {
             onValue(ref(db, 'territories'), (snapshot) => {
                 const data = snapshot.val();
-                // Clear old (not strictly needed for static map interaction but good practice)
-                allPolygons.forEach(p => p.setMap(null));
+                // Clear old visual elements
+                allPolygons.forEach(p => p.poly.setMap(null));
                 allPolygons = [];
 
                 if (data) Object.values(data).forEach(t => {
+                    // Determine Color
+                    const isMine = t.owner === currentUser;
+                    const fillC = isMine ? '#00e676' : '#888';
+                    const strokeC = isMine ? '#004d26' : '#444';
+
+                    // Draw Polygon on Map
                     const poly = new google.maps.Polygon({
                         paths: t.coords,
-                        fillColor: "#555", fillOpacity: 0.3, strokeColor: "#888", strokeWeight: 1,
-                        map: map, clickable: false
+                        fillColor: fillC, fillOpacity: 0.35, 
+                        strokeColor: strokeC, strokeWeight: 1,
+                        map: map, clickable: false // Static view only
                     });
-                    // Store turf polygon for collision check
+
+                    // Store turf polygon for collision check logic
                     const tCoords = t.coords.map(c => [c.lng, c.lat]);
                     tCoords.push([t.coords[0].lng, t.coords[0].lat]);
                     allPolygons.push({ 
                         turfPoly: turf.polygon([tCoords]), 
-                        data: t 
+                        poly: poly 
                     });
                 });
             });
@@ -109,31 +128,25 @@
             const lng = center.lng();
 
             // 1. Generate Circle Polygon Coords
-            // Area = pi * r^2  => r = sqrt(Area / pi)
             const radiusMeters = Math.sqrt(bankAmount / Math.PI);
             const circleCoords = generateCircleCoords(lat, lng, radiusMeters);
 
-            // 2. Create Turf Object for New Land
+            // 2. Create Turf Object for New Land to check for overlaps
             const turfCoords = circleCoords.map(c => [c.lng, c.lat]);
-            turfCoords.push([circleCoords[0].lng, circleCoords[0].lat]); // Close loop
+            turfCoords.push([circleCoords[0].lng, circleCoords[0].lat]); 
             const newPoly = turf.polygon([turfCoords]);
 
-            // 3. Collision Check
-            let collision = false;
-            let guardBlocked = false;
-
+            // 3. Collision Check against ALL loaded polygons
             for(const existing of allPolygons) {
                 if (turf.intersect(newPoly, existing.turfPoly)) {
-                    // Simple logic: Can't place banked land on top of ANY existing land (yours or others)
-                    // Use standard Game mode for complex stealing. Market is for empty space.
-                    alert("Cannot place land here! Territory overlaps with existing land.");
+                    alert("Cannot claim here! Area overlaps with existing territory (Yours or Enemy's). Move to empty space.");
                     return;
                 }
             }
 
             if(!confirm(`Claim this location for ${Math.round(bankAmount)} m²?`)) return;
 
-            // 4. Save
+            // 4. Save to Firebase
             const updates = {};
             const newKey = push(ref(db, 'territories')).key;
             updates[`territories/${newKey}`] = {
@@ -142,17 +155,12 @@
                 areaSize: bankAmount,
                 timestamp: Date.now()
             };
-            updates[`users/${currentUser}/bankedArea`] = 0; // Spend all
+            updates[`users/${currentUser}/bankedArea`] = 0; 
             
-            // Add to total conquest stats
+            // Add bonus credit points
             const userSnap = await get(ref(db, `users/${currentUser}`));
-            const currentTotal = userSnap.val().totalArea || 0; // Not actively used in display but good to have
-            
-            // Note: We don't add credit points here, assuming user got points for walking already? 
-            // Or we can add standard conquest points. Let's add standard points.
             const currentPoints = userSnap.val().creditPoints || 0;
-            const pointsToAdd = 10; // Flat bonus for redeeming
-            updates[`users/${currentUser}/creditPoints`] = currentPoints + pointsToAdd;
+            updates[`users/${currentUser}/creditPoints`] = currentPoints + 10;
 
             try {
                 await update(ref(db), updates);
