@@ -8,219 +8,121 @@
         body { font-family: 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; margin: 0; padding: 20px; min-height: 100vh; }
         .header { text-align: center; border-bottom: 2px solid #8B0000; padding-bottom: 20px; margin-bottom: 20px; }
         h1 { margin: 0; font-family: 'Cinzel', serif; color: #ff4444; font-size: 2rem; letter-spacing: 2px; }
-        
         .stats-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 30px; }
         .stat-card { background: #1a1a1a; padding: 15px; border-radius: 6px; text-align: center; border: 1px solid #333; }
         .stat-val { font-size: 1.5rem; font-weight: bold; color: #C5A059; }
         .stat-label { font-size: 0.8rem; color: #888; }
-
-        /* ACTIVE WAR STYLES */
         .active-war-card { background: linear-gradient(135deg, #2b0000 0%, #000 100%); border: 2px solid #ff4444; padding: 20px; border-radius: 8px; text-align: center; margin-bottom: 30px; animation: pulse 3s infinite; }
         @keyframes pulse { 0% { box-shadow: 0 0 5px rgba(255,0,0,0.2); } 50% { box-shadow: 0 0 15px rgba(255,0,0,0.5); } 100% { box-shadow: 0 0 5px rgba(255,0,0,0.2); } }
-        
-        /* RESULT CARD STYLES */
         .result-card { background: linear-gradient(135deg, #111 0%, #000 100%); border: 2px solid #C5A059; padding: 30px; border-radius: 8px; text-align: center; margin-bottom: 30px; box-shadow: 0 0 30px rgba(197, 160, 89, 0.1); }
         .winner-text { font-family: 'Cinzel', serif; font-size: 1.8rem; color: #FFD700; margin-bottom: 10px; text-shadow: 0 0 10px rgba(255, 215, 0, 0.5); }
         .loser-text { color: #888; font-size: 1rem; margin-bottom: 20px; }
         .result-stats { display: flex; justify-content: space-around; margin-top: 20px; border-top: 1px solid #333; padding-top: 20px; }
         .cooldown-msg { margin-top: 20px; color: #666; font-size: 0.9rem; font-style: italic; }
-
         .score-board { display: flex; justify-content: space-around; margin: 20px 0; align-items: center; }
         .score-box { text-align: center; }
         .vs-text { font-family: 'Cinzel', serif; font-size: 1.5rem; color: #ff4444; }
         .war-timer { font-size: 1.2rem; font-weight: bold; color: #fff; margin-top: 10px; }
-
         .section-title { color: #C5A059; font-family: 'Cinzel', serif; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 5px; }
         .list-item { display: flex; justify-content: space-between; align-items: center; background: #1a1a1a; padding: 10px; margin-bottom: 8px; border-radius: 4px; border: 1px solid #333; }
-        
         .btn { padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; border: none; }
         .btn-accept { background: #00e676; color: black; }
         .btn-decline { background: #333; color: #ff4444; border: 1px solid #ff4444; }
         .btn-challenge { background: #8B0000; color: white; border: 1px solid #ff4444; }
         .btn-disabled { background: #333; color: #555; cursor: default; border: 1px solid #444; }
-
         .back-btn { display: block; margin: 30px auto; text-align: center; color: #888; text-decoration: none; border: 1px solid #444; padding: 10px; width: 150px; border-radius: 20px; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>Theatre of War</h1>
-        <div id="clanNameDisplay" style="color:#888;">Loading...</div>
-    </div>
-
+    <div class="header"><h1>Theatre of War</h1><div id="clanNameDisplay" style="color:#888;">Loading...</div></div>
     <div class="stats-container">
         <div class="stat-card"><div class="stat-val" id="sFought">0</div><div class="stat-label">WARS FOUGHT</div></div>
         <div class="stat-card"><div class="stat-val" id="sWon" style="color:#00e676">0</div><div class="stat-label">VICTORIES</div></div>
         <div class="stat-card"><div class="stat-val" id="sLost" style="color:#ff4444">0</div><div class="stat-label">DEFEATS</div></div>
         <div class="stat-card"><div class="stat-val" id="sPoints">0</div><div class="stat-label">TOTAL WAR POINTS</div></div>
     </div>
-
     <div id="resultSection" style="display:none;">
         <div class="result-card">
             <div style="font-size:3rem; margin-bottom:10px;">🏆</div>
             <div class="winner-text">VICTORY FOR <span id="resWinner">...</span></div>
             <div class="loser-text">Defeated: <span id="resLoser">...</span></div>
-            
-            <div class="result-stats">
-                <div>
-                    <div style="color:#C5A059; font-weight:bold;">WINNER CAPTURED</div>
-                    <div id="resWinArea" style="font-size:1.2rem; color:white;">0 m²</div>
-                </div>
-                <div>
-                    <div style="color:#666; font-weight:bold;">LOSER CAPTURED</div>
-                    <div id="resLoseArea" style="font-size:1.2rem; color:white;">0 m²</div>
-                </div>
-            </div>
-            
-            <div class="cooldown-msg">
-                Armistice in effect. New wars can be declared in: <br>
-                <span id="cooldownTimer" style="color:#fff; font-weight:bold;">...</span>
-            </div>
+            <div class="result-stats"><div><div style="color:#C5A059; font-weight:bold;">WINNER CAPTURED</div><div id="resWinArea" style="font-size:1.2rem; color:white;">0 m²</div></div><div><div style="color:#666; font-weight:bold;">LOSER CAPTURED</div><div id="resLoseArea" style="font-size:1.2rem; color:white;">0 m²</div></div></div>
+            <div class="cooldown-msg">Armistice in effect. New wars can be declared in: <br><span id="cooldownTimer" style="color:#fff; font-weight:bold;">...</span></div>
         </div>
     </div>
-
     <div id="activeWarSection" style="display:none;">
         <div class="section-title">⚔️ CURRENT CONFLICT</div>
         <div class="active-war-card">
             <div id="warStatus">WAR ACTIVE</div>
-            <div class="score-board">
-                <div class="score-box">
-                    <div style="font-size:1.2rem; font-weight:bold; color:#00e676;">YOU</div>
-                    <div id="myWarScore" style="font-size:1.5rem;">0 m²</div>
-                </div>
-                <div class="vs-text">VS</div>
-                <div class="score-box">
-                    <div id="enemyName" style="font-size:1.2rem; font-weight:bold; color:#ff4444;">ENEMY</div>
-                    <div id="enemyWarScore" style="font-size:1.5rem;">0 m²</div>
-                </div>
-            </div>
+            <div class="score-board"><div class="score-box"><div style="font-size:1.2rem; font-weight:bold; color:#00e676;">YOU</div><div id="myWarScore" style="font-size:1.5rem;">0 m²</div></div><div class="vs-text">VS</div><div class="score-box"><div id="enemyName" style="font-size:1.2rem; font-weight:bold; color:#ff4444;">ENEMY</div><div id="enemyWarScore" style="font-size:1.5rem;">0 m²</div></div></div>
             <div class="war-timer" id="warTimer">Loading...</div>
         </div>
     </div>
-
-    <div id="invitesSection">
-        <div class="section-title">📩 WAR CHALLENGES</div>
-        <div id="invitesList"><p style="color:#666;">No pending challenges.</p></div>
-    </div>
-
-    <div id="challengeSection" style="margin-top:30px;">
-        <div class="section-title">📢 DECLARE WAR</div>
-        <div id="clansList">Loading clans...</div>
-    </div>
-
+    <div id="invitesSection"><div class="section-title">📩 WAR CHALLENGES</div><div id="invitesList"><p style="color:#666;">No pending challenges.</p></div></div>
+    <div id="challengeSection" style="margin-top:30px;"><div class="section-title">📢 DECLARE WAR</div><div id="clansList">Loading clans...</div></div>
     <a href="dashboard.html" class="back-btn">← Return to Base</a>
-
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
         import { getDatabase, ref, get, set, update, push, onValue, child } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
-
         const firebaseConfig = { databaseURL: "https://runmate-cb328-default-rtdb.firebaseio.com/" };
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
         const currentUser = localStorage.getItem('currentUser');
-
-        let myClanId = null;
-        let isLeader = false;
-
+        let myClanId = null; let isLeader = false;
         async function init() {
             if(!currentUser) window.location.href = 'index.html';
-            
             const userSnap = await get(ref(db, `users/${currentUser}`));
             myClanId = userSnap.val().clan;
-
-            if(!myClanId) {
-                document.body.innerHTML = "<h2 style='text-align:center; color:#888; margin-top:50px;'>You must join a clan to access the Theatre of War.</h2><a href='dashboard.html' class='back-btn'>Back</a>";
-                return;
-            }
-
+            if(!myClanId) { document.body.innerHTML = "<h2 style='text-align:center; color:#888; margin-top:50px;'>You must join a clan to access the Theatre of War.</h2><a href='dashboard.html' class='back-btn'>Back</a>"; return; }
             document.getElementById('clanNameDisplay').innerText = `Displaying intel for [${myClanId}]`;
-
             onValue(ref(db, `clans/${myClanId}`), (snap) => {
-                const cData = snap.val();
-                if(!cData) return;
-                
+                const cData = snap.val(); if(!cData) return;
                 isLeader = (cData.leader === currentUser);
-                
                 document.getElementById('sFought').innerText = cData.warsFought || 0;
                 document.getElementById('sWon').innerText = cData.warsWon || 0;
                 document.getElementById('sLost').innerText = cData.warsLost || 0;
                 document.getElementById('sPoints').innerText = cData.warPoints || 0;
-
-                // --- MAIN STATE LOGIC ---
-                if(cData.activeWar) {
-                    loadWarData(cData.activeWar);
-                } else {
-                    // No war linked, show normal lobby
+                if(cData.activeWar) { loadWarData(cData.activeWar); } 
+                else {
                     document.getElementById('activeWarSection').style.display = 'none';
                     document.getElementById('resultSection').style.display = 'none';
                     document.getElementById('invitesSection').style.display = 'block';
                     document.getElementById('challengeSection').style.display = 'block';
-                    
-                    loadInvites(cData.warInvites || {});
-                    loadClansList();
+                    loadInvites(cData.warInvites || {}); loadClansList();
                 }
             });
         }
-
         function loadWarData(warId) {
             const warRef = ref(db, `clanWars/${warId}`);
-            
             onValue(warRef, async (snap) => {
                 const war = snap.val();
-                
-                // Safety check: if war data missing but clan points to it, cleanup
-                if(!war) {
-                    await update(ref(db, `clans/${myClanId}`), { activeWar: null });
-                    return;
-                }
-
-                // 1. CHECK IF WAR IS ENDED
+                if(!war) { await update(ref(db, `clans/${myClanId}`), { activeWar: null }); return; }
                 if (war.status === 'ended') {
-                    // Check Cooldown (24 hours after endTime)
                     const cooldownEnd = war.cooldownUntil || (war.endTime + (24 * 60 * 60 * 1000));
-                    
-                    if (Date.now() < cooldownEnd) {
-                        // IN COOLDOWN: Show Results
-                        renderResults(war, cooldownEnd);
-                    } else {
-                        // COOLDOWN OVER: Clear activeWar link and refresh
-                        await update(ref(db, `clans/${myClanId}`), { activeWar: null });
-                        window.location.reload();
-                    }
+                    if (Date.now() < cooldownEnd) { renderResults(war, cooldownEnd); } 
+                    else { await update(ref(db, `clans/${myClanId}`), { activeWar: null }); window.location.reload(); }
                     return;
                 }
-
-                // 2. CHECK IF WAR SHOULD END NOW
-                if (Date.now() > war.endTime && war.status === 'active') {
-                    await endWar(warId, war);
-                    return;
-                }
-
-                // 3. WAR IS ACTIVE
+                if (Date.now() > war.endTime && war.status === 'active') { await endWar(warId, war); return; }
                 renderActiveWar(war);
             });
         }
-
         function renderActiveWar(war) {
             document.getElementById('invitesSection').style.display = 'none';
             document.getElementById('challengeSection').style.display = 'none';
             document.getElementById('resultSection').style.display = 'none';
             document.getElementById('activeWarSection').style.display = 'block';
-
             const iAmChallenger = (war.challenger === myClanId);
             const enemyId = iAmChallenger ? war.defender : war.challenger;
             const myScore = iAmChallenger ? (war.challengerScore || 0) : (war.defenderScore || 0);
             const enemyScore = iAmChallenger ? (war.defenderScore || 0) : (war.challengerScore || 0);
-
             document.getElementById('enemyName').innerText = enemyId;
             document.getElementById('myWarScore').innerText = Math.round(myScore) + " m²";
             document.getElementById('enemyWarScore').innerText = Math.round(enemyScore) + " m²";
-
             const updateTimer = () => {
                 const diff = war.endTime - Date.now();
-                if(diff <= 0) {
-                    document.getElementById('warTimer').innerText = "CALCULATING RESULTS...";
-                } else {
+                if(diff <= 0) { document.getElementById('warTimer').innerText = "CALCULATING RESULTS..."; } 
+                else {
                     const d = Math.floor(diff / (1000 * 60 * 60 * 24));
                     const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
                     const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
@@ -229,67 +131,42 @@
             };
             updateTimer();
         }
-
         function renderResults(war, cooldownEnd) {
             document.getElementById('invitesSection').style.display = 'none';
             document.getElementById('challengeSection').style.display = 'none';
             document.getElementById('activeWarSection').style.display = 'none';
             document.getElementById('resultSection').style.display = 'block';
-
             const winner = war.winner === 'draw' ? "NO ONE (DRAW)" : war.winner;
             const loser = war.winner === 'draw' ? "Both Sides" : (war.winner === war.challenger ? war.defender : war.challenger);
-            
-            // Get areas
             const winArea = war.winner === war.challenger ? war.challengerScore : war.defenderScore;
             const loseArea = war.winner === war.challenger ? war.defenderScore : war.challengerScore;
-
             document.getElementById('resWinner').innerText = winner;
             document.getElementById('resLoser').innerText = loser;
-            
-            if(war.winner === 'draw') {
-                 document.getElementById('resWinArea').innerText = Math.round(war.challengerScore) + " m²";
-                 document.getElementById('resLoseArea').innerText = Math.round(war.defenderScore) + " m²";
-            } else {
-                 document.getElementById('resWinArea').innerText = Math.round(winArea) + " m²";
-                 document.getElementById('resLoseArea').innerText = Math.round(loseArea) + " m²";
-            }
-
+            if(war.winner === 'draw') { document.getElementById('resWinArea').innerText = Math.round(war.challengerScore) + " m²"; document.getElementById('resLoseArea').innerText = Math.round(war.defenderScore) + " m²"; } 
+            else { document.getElementById('resWinArea').innerText = Math.round(winArea) + " m²"; document.getElementById('resLoseArea').innerText = Math.round(loseArea) + " m²"; }
             const updateCool = () => {
                 const diff = cooldownEnd - Date.now();
-                if(diff <= 0) {
-                     window.location.reload(); 
-                } else {
+                if(diff <= 0) { window.location.reload(); } 
+                else {
                     const h = Math.floor(diff / (1000 * 60 * 60));
                     const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
                     const s = Math.floor((diff % (1000 * 60)) / 1000);
                     document.getElementById('cooldownTimer').innerText = `${h}h ${m}m ${s}s`;
                 }
             };
-            updateCool();
-            setInterval(updateCool, 1000);
+            updateCool(); setInterval(updateCool, 1000);
         }
-
         async function endWar(warId, war) {
             const updates = {};
             const challengerScore = war.challengerScore || 0;
             const defenderScore = war.defenderScore || 0;
-            
-            let winnerId = null;
-            let loserId = null;
-
+            let winnerId = null; let loserId = null;
             if (challengerScore > defenderScore) { winnerId = war.challenger; loserId = war.defender; }
             else if (defenderScore > challengerScore) { winnerId = war.defender; loserId = war.challenger; }
             else { winnerId = 'draw'; }
-
-            // 1. Mark War Ended + Set Cooldown (24 hours)
             updates[`clanWars/${warId}/status`] = 'ended';
             updates[`clanWars/${warId}/winner`] = winnerId;
             updates[`clanWars/${warId}/cooldownUntil`] = Date.now() + (24 * 60 * 60 * 1000);
-            
-            // IMPORTANT: We do NOT remove activeWar from clans here. 
-            // We keep it so they see the result screen until cooldown expires.
-
-            // 2. Update Stats
             const updateClan = async (cid, won) => {
                 const cRef = ref(db, `clans/${cid}`);
                 const s = await get(cRef);
@@ -298,9 +175,7 @@
                 let w = (cv.warsWon || 0) + (won ? 1 : 0);
                 let l = (cv.warsLost || 0) + (!won && winnerId !== 'draw' ? 1 : 0);
                 let pts = (cv.warPoints || 0) + (won ? (3 * Object.keys(cv.members).length) : 0); 
-                
                 await update(cRef, { warsFought: f, warsWon: w, warsLost: l, warPoints: pts });
-                
                 if(won) {
                     for(const mem of Object.keys(cv.members)) {
                          const uRef = ref(db, `users/${mem}`);
@@ -310,101 +185,42 @@
                     }
                 }
             };
-
-            if(winnerId !== 'draw') {
-                await updateClan(winnerId, true);
-                await updateClan(loserId, false);
-            }
-
+            if(winnerId !== 'draw') { await updateClan(winnerId, true); await updateClan(loserId, false); }
             await update(ref(db), updates);
-            // Reload handled by listener automatically picking up 'ended' status
         }
-
         function loadInvites(invites) {
             const list = document.getElementById('invitesList');
             const keys = Object.keys(invites);
             if(keys.length === 0) { list.innerHTML = "<p style='color:#666; text-align:center;'>No pending challenges.</p>"; return; }
-            
-            list.innerHTML = keys.map(clanId => `
-                <div class="list-item">
-                    <span>⚔️ Challenge from <b>${clanId}</b></span>
-                    <div>
-                        ${isLeader ? `
-                            <button class="btn btn-accept" onclick="window.acceptWar('${clanId}')">Accept</button>
-                            <button class="btn btn-decline" onclick="window.rejectWar('${clanId}')">Reject</button>
-                        ` : `<span style="font-size:0.8rem; color:#666;">Leader only</span>`}
-                    </div>
-                </div>
-            `).join('');
+            list.innerHTML = keys.map(clanId => `<div class="list-item"><span>⚔️ Challenge from <b>${clanId}</b></span><div>${isLeader ? `<button class="btn btn-accept" onclick="window.acceptWar('${clanId}')">Accept</button><button class="btn btn-decline" onclick="window.rejectWar('${clanId}')">Reject</button>` : `<span style="font-size:0.8rem; color:#666;">Leader only</span>`}</div></div>`).join('');
         }
-
         async function loadClansList() {
             const list = document.getElementById('clansList');
             const snap = await get(ref(db, 'clans'));
             const clans = snap.val() || {};
-            
             let html = "";
             Object.keys(clans).forEach(cId => {
                 if(cId === myClanId) return; 
-                if(clans[cId].activeWar) return; // Don't show clans already at war (or in cooldown)
-
+                if(clans[cId].activeWar) return; 
                 const sentInvite = clans[cId].warInvites && clans[cId].warInvites[myClanId];
-
-                html += `
-                <div class="list-item">
-                    <div>
-                        <div style="font-weight:bold; color:white;">${cId}</div>
-                        <div style="font-size:0.8rem; color:#888;">Leader: ${clans[cId].leader}</div>
-                    </div>
-                    ${isLeader ? `
-                        <button class="btn ${sentInvite ? 'btn-disabled' : 'btn-challenge'}" 
-                            onclick="window.sendWarInvite('${cId}')" ${sentInvite ? 'disabled' : ''}>
-                            ${sentInvite ? 'Sent' : 'Declare War'}
-                        </button>
-                    ` : `<span style="font-size:0.8rem; color:#666;">Leader only</span>`}
-                </div>`;
+                html += `<div class="list-item"><div><div style="font-weight:bold; color:white;">${cId}</div><div style="font-size:0.8rem; color:#888;">Leader: ${clans[cId].leader}</div></div>${isLeader ? `<button class="btn ${sentInvite ? 'btn-disabled' : 'btn-challenge'}" onclick="window.sendWarInvite('${cId}')" ${sentInvite ? 'disabled' : ''}>${sentInvite ? 'Sent' : 'Declare War'}</button>` : `<span style="font-size:0.8rem; color:#666;">Leader only</span>`}</div>`;
             });
             list.innerHTML = html || "<p style='text-align:center;'>No clans available to fight.</p>";
         }
-
-        // --- GLOBAL ACTIONS ---
-        window.sendWarInvite = async (targetId) => {
-            if(!confirm(`Declare war on ${targetId}?`)) return;
-            await set(ref(db, `clans/${targetId}/warInvites/${myClanId}`), true);
-            alert("War declaration sent!");
-            window.location.reload();
-        };
-
+        window.sendWarInvite = async (targetId) => { if(!confirm(`Declare war on ${targetId}?`)) return; await set(ref(db, `clans/${targetId}/warInvites/${myClanId}`), true); alert("War declaration sent!"); window.location.reload(); };
         window.acceptWar = async (targetId) => {
             if(!confirm(`Accept war with ${targetId}? Starts immediately for 5 days.`)) return;
-            
             const warId = push(ref(db, 'clanWars')).key;
-            const warData = {
-                challenger: targetId,
-                defender: myClanId,
-                status: 'active',
-                startTime: Date.now(),
-                endTime: Date.now() + (5 * 24 * 60 * 60 * 1000), // 5 Days
-                challengerScore: 0,
-                defenderScore: 0
-            };
-
+            const warData = { challenger: targetId, defender: myClanId, status: 'active', startTime: Date.now(), endTime: Date.now() + (5 * 24 * 60 * 60 * 1000), challengerScore: 0, defenderScore: 0 };
             const updates = {};
             updates[`clanWars/${warId}`] = warData;
             updates[`clans/${targetId}/activeWar`] = warId;
             updates[`clans/${myClanId}/activeWar`] = warId;
             updates[`clans/${myClanId}/warInvites/${targetId}`] = null;
-
             await update(ref(db), updates);
             alert("WAR HAS BEGUN!");
         };
-
-        window.rejectWar = async (targetId) => {
-            if(!confirm("Decline challenge?")) return;
-            await set(ref(db, `clans/${myClanId}/warInvites/${targetId}`), null);
-            window.location.reload();
-        };
-
+        window.rejectWar = async (targetId) => { if(!confirm("Decline challenge?")) return; await set(ref(db, `clans/${myClanId}/warInvites/${targetId}`), null); window.location.reload(); };
         init();
     </script>
 </body>
