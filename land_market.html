@@ -10,8 +10,7 @@
         .header { background: #111; padding: 15px; border-bottom: 2px solid #C5A059; text-align: center; color: white; display:flex; justify-content:space-between; align-items:center; }
         .bank-display { color: #FFD700; font-weight: bold; font-size: 1.1rem; border: 1px solid #C5A059; padding: 5px 10px; border-radius: 4px; }
         
-        /* Added background color to verify layout visibility */
-        #map { flex: 1; position: relative; background: #222; }
+        #map { flex: 1; position: relative; background: #e0e0e0; }
         
         .crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; pointer-events: none; z-index: 10; opacity: 0.8; }
         .controls { padding: 15px; background: #111; border-top: 1px solid #333; text-align: center; }
@@ -31,13 +30,13 @@
 
     <div id="map">
         <div class="legend">
-            <div class="legend-item"><div class="color-box" style="background:#00e676; opacity:0.4;"></div>Your Land</div>
-            <div class="legend-item"><div class="color-box" style="background:#888; opacity:0.4;"></div>Enemy Land</div>
+            <div class="legend-item"><div class="color-box" style="background:#00e676; opacity:0.6;"></div>Your Land</div>
+            <div class="legend-item"><div class="color-box" style="background:#888; opacity:0.6;"></div>Occupied</div>
         </div>
         <svg class="crosshair" viewBox="0 0 100 100">
-            <line x1="50" y1="0" x2="50" y2="100" stroke="#FFD700" stroke-width="2" />
-            <line x1="0" y1="50" x2="100" y2="50" stroke="#FFD700" stroke-width="2" />
-            <circle cx="50" cy="50" r="40" stroke="#FFD700" stroke-width="2" fill="none" />
+            <line x1="50" y1="0" x2="50" y2="100" stroke="#000" stroke-width="2" />
+            <line x1="0" y1="50" x2="100" y2="50" stroke="#000" stroke-width="2" />
+            <circle cx="50" cy="50" r="40" stroke="#000" stroke-width="2" fill="none" />
         </svg>
     </div>
 
@@ -50,7 +49,6 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
         import { getDatabase, ref, push, update, onValue, get } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
-        // --- API KEY UPDATED ---
         const GOOGLE_API_KEY = "AIzaSyAzfoxuzRbmyrhGChfTEWB05xvyNRmvK3k"; 
         
         const firebaseConfig = { databaseURL: "https://runmate-cb328-default-rtdb.firebaseio.com/" };
@@ -63,27 +61,27 @@
         let map, bankAmount = 0;
         let allPolygons = []; 
 
-        // 1. Define initMap globally so Google Script can find it
         window.initMap = function() {
             console.log("Map Initializing...");
             const mapEl = document.getElementById("map");
             
             try {
+                // CHANGED: mapTypeId set to 'roadmap' (default)
                 map = new google.maps.Map(mapEl, {
                     zoom: 18, 
                     center: { lat: 0, lng: 0 }, 
-                    mapTypeId: 'satellite', 
-                    disableDefaultUI: true
+                    mapTypeId: 'roadmap', 
+                    disableDefaultUI: true,
+                    styles: [
+                        { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] }
+                    ]
                 });
 
                 if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition(pos => {
                         map.setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-                    }, () => {
-                        console.log("Geolocation failed or blocked.");
                     });
                 } else {
-                    // Fallback if no geo
                     map.setCenter({ lat: 40.7128, lng: -74.0060 });
                 }
 
@@ -91,19 +89,16 @@
                 loadExistingLands();
             } catch (err) {
                 console.error("Map Error:", err);
-                mapEl.innerHTML = `<div style="color:white; text-align:center; padding-top:50px;">Map Failed to Load.<br><small>${err.message}</small></div>`;
             }
         };
 
-        // 2. Dynamic Script Loader to prevent Race Conditions
         function loadGoogleMaps() {
-            if (document.getElementById('google-maps-script')) return; // already loaded
+            if (document.getElementById('google-maps-script')) return; 
             const script = document.createElement('script');
             script.id = 'google-maps-script';
             script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_API_KEY}&libraries=geometry&callback=initMap`;
             script.async = true;
             script.defer = true;
-            script.onerror = () => alert("Failed to load Google Maps. Check your API Key.");
             document.head.appendChild(script);
         }
 
@@ -129,28 +124,26 @@
         function loadExistingLands() {
             onValue(ref(db, 'territories'), (snapshot) => {
                 const data = snapshot.val();
-                
-                // Clear old visual elements if they exist
                 if(allPolygons.length > 0) {
                     allPolygons.forEach(p => p.poly.setMap(null));
                     allPolygons = [];
                 }
 
                 if (data) Object.values(data).forEach(t => {
-                    // Determine Color
+                    // Visuals for Roadmap: Stronger colors
                     const isMine = t.owner === currentUser;
-                    const fillC = isMine ? '#00e676' : '#888';
-                    const strokeC = isMine ? '#004d26' : '#444';
+                    const fillC = isMine ? '#00e676' : '#555555';
+                    const strokeC = isMine ? '#004d26' : '#222222';
+                    const zIdx = isMine ? 10 : 1;
 
-                    // Draw Polygon on Map
                     const poly = new google.maps.Polygon({
                         paths: t.coords,
-                        fillColor: fillC, fillOpacity: 0.35, 
-                        strokeColor: strokeC, strokeWeight: 1,
+                        fillColor: fillC, fillOpacity: 0.5, 
+                        strokeColor: strokeC, strokeWeight: 2,
+                        zIndex: zIdx,
                         map: map, clickable: false 
                     });
 
-                    // Store turf polygon for collision check
                     const tCoords = t.coords.map(c => [c.lng, c.lat]);
                     tCoords.push([t.coords[0].lng, t.coords[0].lat]);
                     allPolygons.push({ 
@@ -167,26 +160,22 @@
             const lat = center.lat();
             const lng = center.lng();
 
-            // 1. Generate Circle Polygon Coords
             const radiusMeters = Math.sqrt(bankAmount / Math.PI);
             const circleCoords = generateCircleCoords(lat, lng, radiusMeters);
 
-            // 2. Create Turf Object for New Land
             const turfCoords = circleCoords.map(c => [c.lng, c.lat]);
             turfCoords.push([circleCoords[0].lng, circleCoords[0].lat]); 
             const newPoly = turf.polygon([turfCoords]);
 
-            // 3. Collision Check
             for(const existing of allPolygons) {
                 if (turf.intersect(newPoly, existing.turfPoly)) {
-                    alert("Cannot claim here! Area overlaps with existing territory. Move to empty space.");
+                    alert("Cannot claim here! Area overlaps with existing territory.");
                     return;
                 }
             }
 
             if(!confirm(`Claim this location for ${Math.round(bankAmount)} m²?`)) return;
 
-            // 4. Save
             const updates = {};
             const newKey = push(ref(db, 'territories')).key;
             updates[`territories/${newKey}`] = {
@@ -223,7 +212,6 @@
             return coords;
         }
 
-        // Start loading the map
         loadGoogleMaps();
     </script>
 </body>
