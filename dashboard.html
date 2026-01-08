@@ -20,10 +20,8 @@
         .points-card { grid-column: span 2; border: 1px solid #FFD700; background: linear-gradient(90deg, #222 0%, #333 100%); cursor: pointer; transition: transform 0.1s; }
         .points-card:active { transform: scale(0.98); }
         .points-header { color: #FFD700; font-family: 'Cinzel', serif; margin-bottom: 5px; }
-        
         .bank-card { grid-column: span 2; border: 1px solid #C5A059; background: #1a0f00; display: flex; justify-content: space-between; align-items: center; padding: 15px; }
         .btn-redeem { background: #C5A059; color: black; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold; cursor: pointer; }
-
         .clan-section { background: #111; padding: 25px; border: 1px solid #554422; border-radius: 8px; margin-bottom: 20px; text-align: center; }
         .btn-manage { background: #8B0000; color: white; width: 100%; padding: 15px; border: 1px solid #ff4444; cursor: pointer; font-family: 'Cinzel', serif; font-weight: bold; }
         .btn-play { width: 100%; padding: 20px; background: linear-gradient(180deg, #D4AF37 0%, #AA8A26 100%); color: #220; border: 1px solid #FFD700; font-family: 'Cinzel', serif; font-weight: bold; font-size: 1.3rem; cursor: pointer; margin-top: 10px; }
@@ -87,14 +85,12 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
     import { getDatabase, ref, update, onValue, get, child, set } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
-
     const firebaseConfig = { databaseURL: "https://runmate-cb328-default-rtdb.firebaseio.com/" };
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
     const currentUser = localStorage.getItem('currentUser');
     
     let currentStreakData = 0;
-
     if (!currentUser) window.location.href = 'index.html';
     document.getElementById('displayName').innerText = currentUser;
     document.getElementById('displayIcon').innerText = localStorage.getItem('userIcon') || '👤';
@@ -102,7 +98,7 @@
     window.logout = function() { if(confirm("Logout?")) { localStorage.clear(); window.location.href = 'index.html'; }};
 
     window.showStreakDetails = function() {
-        alert(`🔥 Current Streak: ${currentStreakData} Days\n\nKeep conquering at least 100m² daily to maintain your streak and earn bonus points!`);
+        alert(`🔥 Current Streak: ${currentStreakData} Days\n\nKeep conquering at least 1000m² daily to maintain your streak and earn bonus points!`);
     };
 
     window.acceptInvite = async (newClanId) => {
@@ -123,11 +119,9 @@
     onValue(ref(db, `users/${currentUser}`), (snapshot) => {
         const user = snapshot.val();
         if(!user) return; 
-
         document.getElementById('creditPoints').innerText = user.creditPoints || 0;
         document.getElementById('bankedAreaDisplay').innerText = Math.round(user.bankedArea || 0) + " m²";
         currentStreakData = user.streak || 0;
-
         const panel = document.getElementById('invitesPanel');
         if (user.invites) {
             panel.style.display = 'block';
@@ -136,7 +130,6 @@
                 panel.innerHTML += `<div class="invite-card"><div class="invite-text">INVITE: <b>${c}</b></div><div><button class="btn-accept-sm" onclick="window.acceptInvite('${c}')">Accept</button><button class="btn-decline-sm" onclick="window.rejectInvite('${c}')">Reject</button></div></div>`;
             });
         } else { panel.style.display = 'none'; }
-
         if (user.clan) {
             document.getElementById('clanControlPanel').style.display = 'block';
             document.getElementById('noClanPanel').style.display = 'none';
