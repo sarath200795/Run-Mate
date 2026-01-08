@@ -102,7 +102,7 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
         
-        let map, userMarker, activePolyline, watchId, pathCoords = [];
+        let map, userMarker, activePolyline = null, watchId, pathCoords = [];
         let allPolygons = []; let visualPolygons = []; let lastKnownPos = null;
         let gameMode = 'outdoor'; let indoorDistance = 0; let lastIndoorPos = null;
         const currentUser = localStorage.getItem('currentUser');
@@ -257,22 +257,28 @@
         // --- BUTTON HANDLERS ---
         document.getElementById('startBtn').addEventListener('click', () => {
             if (!map && gameMode === 'outdoor') return alert("Map loading...");
-            pathCoords = []; 
-            document.getElementById('startBtn').style.display = 'none'; 
             
+            // CLEAN RESET
+            pathCoords = [];
+            if(activePolyline) { activePolyline.setMap(null); activePolyline = null; }
+            
+            document.getElementById('startBtn').style.display = 'none'; 
             const stopBtn = document.getElementById('stopBtn');
             stopBtn.style.display = 'block';
             stopBtn.innerText = "🚩 Claim Territory (0 m²)";
             stopBtn.classList.remove('ready'); 
             
             if (gameMode === 'outdoor') {
+                if(lastKnownPos) map.panTo(lastKnownPos); // Immediate visual feedback
+                
                 activePolyline = new google.maps.Polyline({ path: [], strokeColor: "#FFFF00", strokeWeight: 6, map: map });
                 watchId = navigator.geolocation.watchPosition(pos => {
                     const latLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                     pathCoords.push(latLng); 
-                    activePolyline.getPath().push(new google.maps.LatLng(latLng.lat, latLng.lng));
+                    if(activePolyline) activePolyline.getPath().push(new google.maps.LatLng(latLng.lat, latLng.lng));
                     map.panTo(latLng); updateUserMarker(latLng);
-                    if (pathCoords.length > 2) {
+                    
+                    if (pathCoords.length > 2 && activePolyline) {
                         const rawArea = google.maps.geometry.spherical.computeArea(activePolyline.getPath());
                         stopBtn.innerText = `🚩 Claim Territory (${Math.round(rawArea)} m²)`;
                         if (rawArea >= 1000) { stopBtn.classList.add('ready'); stopBtn.innerText = `🏆 CLAIM VICTORY (${Math.round(rawArea)} m²)`; } else { stopBtn.classList.remove('ready'); }
@@ -309,8 +315,9 @@
         document.getElementById('stopBtn').addEventListener('click', async () => {
             const btn = document.getElementById('stopBtn');
             const startBtn = document.getElementById('startBtn');
+            navigator.geolocation.clearWatch(watchId); // Stop tracking immediately
+
             if (gameMode === 'indoor') {
-                navigator.geolocation.clearWatch(watchId);
                 const r = indoorDistance / (2 * Math.PI);
                 const finalArea = Math.PI * r * r;
                 if (finalArea < 5) return alert("Walk more! Distance too short.");
@@ -321,10 +328,14 @@
                 startBtn.style.display = 'block'; btn.style.display = 'none';
                 return;
             }
+
             if (pathCoords.length < 3) { 
-                alert("Path too short."); navigator.geolocation.clearWatch(watchId); activePolyline.setMap(null); startBtn.style.display = 'block'; btn.style.display = 'none'; return;
+                alert("Path too short."); 
+                if(activePolyline) { activePolyline.setMap(null); activePolyline = null; }
+                startBtn.style.display = 'block'; btn.style.display = 'none'; 
+                return;
             }
-            navigator.geolocation.clearWatch(watchId);
+
             btn.innerText = "Calculations..."; btn.disabled = true;
             try {
                 const turfCoords = pathCoords.map(p => [p.lng, p.lat]);
@@ -398,7 +409,14 @@
                     alert(`Conquest Complete!\nClaimed: ${Math.round(finalMyArea)} m²${stolenText}${pointMsg}`);
                 } else { alert("Area too small or blocked by guards."); }
             } catch(e) { console.error(e); alert("Error during calculation: " + e.message); } 
-            finally { activePolyline.setMap(null); startBtn.style.display = 'block'; btn.style.display = 'none'; btn.disabled = false; btn.innerText = "🚩 Claim Territory"; }
+            finally { 
+                if(activePolyline) activePolyline.setMap(null); 
+                activePolyline = null; // IMPORTANT: Prevent ghost references
+                startBtn.style.display = 'block'; 
+                btn.style.display = 'none'; 
+                btn.disabled = false; 
+                btn.innerText = "🚩 Claim Territory"; 
+            }
         });
 
         function loadTerritories() {
