@@ -25,7 +25,6 @@
         <div class="bank-display">Banked: <span id="bankVal">0</span> m²</div>
         <div style="width:50px;"></div> 
     </div>
-
     <div id="map">
         <div class="legend">
             <div class="legend-item"><div class="color-box" style="background:#00e676; opacity:0.6;"></div>Your Land</div>
@@ -37,126 +36,76 @@
             <circle cx="50" cy="50" r="40" stroke="#000" stroke-width="2" fill="none" />
         </svg>
     </div>
-
     <div class="controls">
         <div style="color:#888; font-size:0.9rem; margin-bottom:10px;">Drag map to position target (Must be empty space)</div>
         <button class="btn-claim" id="btnClaim">CLAIM THIS SPOT</button>
     </div>
-
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
         import { getDatabase, ref, push, update, onValue, get } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
-
         const GOOGLE_API_KEY = "AIzaSyAzfoxuzRbmyrhGChfTEWB05xvyNRmvK3k"; 
         const firebaseConfig = { databaseURL: "https://runmate-cb328-default-rtdb.firebaseio.com/" };
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
         const currentUser = localStorage.getItem('currentUser');
-
         if (!currentUser) window.location.href = 'index.html';
-
-        let map, bankAmount = 0;
-        let allPolygons = []; 
-
+        let map, bankAmount = 0; let allPolygons = []; 
         window.initMap = function() {
-            console.log("Map Initializing...");
             const mapEl = document.getElementById("map");
             try {
-                map = new google.maps.Map(mapEl, {
-                    zoom: 18, center: { lat: 0, lng: 0 }, mapTypeId: 'roadmap', disableDefaultUI: true,
-                    styles: [{ featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] }]
-                });
-
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(pos => {
-                        map.setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-                    });
-                } else { map.setCenter({ lat: 40.7128, lng: -74.0060 }); }
+                map = new google.maps.Map(mapEl, { zoom: 18, center: { lat: 0, lng: 0 }, mapTypeId: 'roadmap', disableDefaultUI: true, styles: [{ featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] }] });
+                if (navigator.geolocation) { navigator.geolocation.getCurrentPosition(pos => { map.setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude }); }); } 
+                else { map.setCenter({ lat: 40.7128, lng: -74.0060 }); }
                 loadUserData(); loadExistingLands();
             } catch (err) { console.error("Map Error:", err); }
         };
-
         function loadGoogleMaps() {
             if (document.getElementById('google-maps-script')) return; 
-            const script = document.createElement('script');
-            script.id = 'google-maps-script';
-            script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_API_KEY}&libraries=geometry&callback=initMap`;
-            script.async = true; script.defer = true;
-            document.head.appendChild(script);
+            const script = document.createElement('script'); script.id = 'google-maps-script'; script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_API_KEY}&libraries=geometry&callback=initMap`; script.async = true; script.defer = true; document.head.appendChild(script);
         }
-
         function loadUserData() {
             onValue(ref(db, `users/${currentUser}`), (snap) => {
-                const val = snap.val();
-                bankAmount = val ? (val.bankedArea || 0) : 0;
+                const val = snap.val(); bankAmount = val ? (val.bankedArea || 0) : 0;
                 document.getElementById('bankVal').innerText = Math.round(bankAmount);
                 const btn = document.getElementById('btnClaim');
-                if(bankAmount < 5) {
-                    btn.disabled = true; btn.style.background = "#333"; btn.innerText = "Insufficient Banked Area";
-                } else {
-                    btn.disabled = false; btn.style.background = "#C5A059"; btn.innerText = "CLAIM THIS SPOT";
-                }
+                if(bankAmount < 5) { btn.disabled = true; btn.style.background = "#333"; btn.innerText = "Insufficient Banked Area"; } 
+                else { btn.disabled = false; btn.style.background = "#C5A059"; btn.innerText = "CLAIM THIS SPOT"; }
             });
         }
-
         function loadExistingLands() {
             onValue(ref(db, 'territories'), (snapshot) => {
                 const data = snapshot.val();
                 if(allPolygons.length > 0) { allPolygons.forEach(p => p.poly.setMap(null)); allPolygons = []; }
                 if (data) Object.values(data).forEach(t => {
-                    const isMine = t.owner === currentUser;
-                    const fillC = isMine ? '#00e676' : '#555555';
-                    const strokeC = isMine ? '#004d26' : '#222222';
-                    const zIdx = isMine ? 10 : 1;
-                    const poly = new google.maps.Polygon({
-                        paths: t.coords, fillColor: fillC, fillOpacity: 0.5, strokeColor: strokeC, strokeWeight: 2, zIndex: zIdx, map: map, clickable: false 
-                    });
-                    const tCoords = t.coords.map(c => [c.lng, c.lat]);
-                    tCoords.push([t.coords[0].lng, t.coords[0].lat]);
+                    const isMine = t.owner === currentUser; const fillC = isMine ? '#00e676' : '#555555'; const strokeC = isMine ? '#004d26' : '#222222'; const zIdx = isMine ? 10 : 1;
+                    const poly = new google.maps.Polygon({ paths: t.coords, fillColor: fillC, fillOpacity: 0.5, strokeColor: strokeC, strokeWeight: 2, zIndex: zIdx, map: map, clickable: false });
+                    const tCoords = t.coords.map(c => [c.lng, c.lat]); tCoords.push([t.coords[0].lng, t.coords[0].lat]);
                     allPolygons.push({ turfPoly: turf.polygon([tCoords]), poly: poly });
                 });
             });
         }
-
         document.getElementById('btnClaim').addEventListener('click', async () => {
             if(bankAmount < 5) return;
-            const center = map.getCenter();
-            const lat = center.lat();
-            const lng = center.lng();
+            const center = map.getCenter(); const lat = center.lat(); const lng = center.lng();
             const radiusMeters = Math.sqrt(bankAmount / Math.PI);
             const circleCoords = generateCircleCoords(lat, lng, radiusMeters);
-            const turfCoords = circleCoords.map(c => [c.lng, c.lat]);
-            turfCoords.push([circleCoords[0].lng, circleCoords[0].lat]); 
-            const newPoly = turf.polygon([turfCoords]);
-
-            for(const existing of allPolygons) {
-                if (turf.intersect(newPoly, existing.turfPoly)) { return alert("Cannot claim here! Area overlaps with existing territory."); }
-            }
-
+            const turfCoords = circleCoords.map(c => [c.lng, c.lat]); turfCoords.push([circleCoords[0].lng, circleCoords[0].lat]); const newPoly = turf.polygon([turfCoords]);
+            for(const existing of allPolygons) { if (turf.intersect(newPoly, existing.turfPoly)) { return alert("Cannot claim here! Area overlaps with existing territory."); } }
             if(!confirm(`Claim this location for ${Math.round(bankAmount)} m²?`)) return;
-
-            const updates = {};
-            const newKey = push(ref(db, 'territories')).key;
-            // UPDATED: Added source: 'Market'
+            const updates = {}; const newKey = push(ref(db, 'territories')).key;
             updates[`territories/${newKey}`] = { owner: currentUser, coords: circleCoords, areaSize: bankAmount, timestamp: Date.now(), source: 'Market' };
             updates[`users/${currentUser}/bankedArea`] = 0; 
-            const userSnap = await get(ref(db, `users/${currentUser}`));
-            const currentPoints = userSnap.val().creditPoints || 0;
+            const userSnap = await get(ref(db, `users/${currentUser}`)); const currentPoints = userSnap.val().creditPoints || 0;
             updates[`users/${currentUser}/creditPoints`] = currentPoints + 10;
-
             try { await update(ref(db), updates); alert("Territory Claimed Successfully!"); window.location.href = 'dashboard.html'; } catch(e) { alert("Error: " + e.message); }
         });
-
         function generateCircleCoords(lat, lng, radius) {
             const points = 32; const coords = [];
             for (let i = 0; i < points; i++) {
-                const theta = (i / points) * (2 * Math.PI);
-                const offset = google.maps.geometry.spherical.computeOffset(new google.maps.LatLng(lat, lng), radius, (theta * 180) / Math.PI);
+                const theta = (i / points) * (2 * Math.PI); const offset = google.maps.geometry.spherical.computeOffset(new google.maps.LatLng(lat, lng), radius, (theta * 180) / Math.PI);
                 coords.push({ lat: offset.lat(), lng: offset.lng() });
-            }
-            return coords;
+            } return coords;
         }
-
         loadGoogleMaps();
     </script>
 </body>
