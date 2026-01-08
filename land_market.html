@@ -9,12 +9,15 @@
         body { margin: 0; padding: 0; background: #000; font-family: 'Segoe UI', sans-serif; height: 100vh; display: flex; flex-direction: column; }
         .header { background: #111; padding: 15px; border-bottom: 2px solid #C5A059; text-align: center; color: white; display:flex; justify-content:space-between; align-items:center; }
         .bank-display { color: #FFD700; font-weight: bold; font-size: 1.1rem; border: 1px solid #C5A059; padding: 5px 10px; border-radius: 4px; }
-        #map { flex: 1; position: relative; }
+        
+        /* Added background color to verify layout visibility */
+        #map { flex: 1; position: relative; background: #222; }
+        
         .crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; pointer-events: none; z-index: 10; opacity: 0.8; }
         .controls { padding: 15px; background: #111; border-top: 1px solid #333; text-align: center; }
         .btn-claim { background: #C5A059; color: black; border: none; padding: 15px 30px; font-weight: bold; font-family: 'Cinzel', serif; font-size: 1.1rem; border-radius: 4px; cursor: pointer; width: 100%; max-width: 300px; }
         .btn-back { background: none; border: 1px solid #555; color: #888; padding: 5px 10px; font-size: 0.8rem; cursor: pointer; border-radius: 4px; }
-        .legend { position: absolute; bottom: 140px; left: 10px; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 4px; font-size: 0.8rem; color: #ccc; pointer-events: none; }
+        .legend { position: absolute; bottom: 140px; left: 10px; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 4px; font-size: 0.8rem; color: #ccc; pointer-events: none; z-index: 5; }
         .legend-item { display: flex; align-items: center; margin-bottom: 5px; }
         .color-box { width: 15px; height: 15px; margin-right: 8px; border: 1px solid #fff; }
     </style>
@@ -47,6 +50,9 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
         import { getDatabase, ref, push, update, onValue, get } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
+        // --- API KEY UPDATED ---
+        const GOOGLE_API_KEY = "AIzaSyAzfoxuzRbmyrhGChfTEWB05xvyNRmvK3k"; 
+        
         const firebaseConfig = { databaseURL: "https://runmate-cb328-default-rtdb.firebaseio.com/" };
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
@@ -57,25 +63,56 @@
         let map, bankAmount = 0;
         let allPolygons = []; 
 
+        // 1. Define initMap globally so Google Script can find it
         window.initMap = function() {
-            map = new google.maps.Map(document.getElementById("map"), {
-                zoom: 18, center: { lat: 0, lng: 0 }, mapTypeId: 'satellite', disableDefaultUI: true
-            });
-
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(pos => {
-                    map.setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+            console.log("Map Initializing...");
+            const mapEl = document.getElementById("map");
+            
+            try {
+                map = new google.maps.Map(mapEl, {
+                    zoom: 18, 
+                    center: { lat: 0, lng: 0 }, 
+                    mapTypeId: 'satellite', 
+                    disableDefaultUI: true
                 });
-            }
 
-            loadUserData();
-            loadExistingLands();
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(pos => {
+                        map.setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                    }, () => {
+                        console.log("Geolocation failed or blocked.");
+                    });
+                } else {
+                    // Fallback if no geo
+                    map.setCenter({ lat: 40.7128, lng: -74.0060 });
+                }
+
+                loadUserData();
+                loadExistingLands();
+            } catch (err) {
+                console.error("Map Error:", err);
+                mapEl.innerHTML = `<div style="color:white; text-align:center; padding-top:50px;">Map Failed to Load.<br><small>${err.message}</small></div>`;
+            }
         };
+
+        // 2. Dynamic Script Loader to prevent Race Conditions
+        function loadGoogleMaps() {
+            if (document.getElementById('google-maps-script')) return; // already loaded
+            const script = document.createElement('script');
+            script.id = 'google-maps-script';
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_API_KEY}&libraries=geometry&callback=initMap`;
+            script.async = true;
+            script.defer = true;
+            script.onerror = () => alert("Failed to load Google Maps. Check your API Key.");
+            document.head.appendChild(script);
+        }
 
         function loadUserData() {
             onValue(ref(db, `users/${currentUser}`), (snap) => {
-                bankAmount = snap.val().bankedArea || 0;
+                const val = snap.val();
+                bankAmount = val ? (val.bankedArea || 0) : 0;
                 document.getElementById('bankVal').innerText = Math.round(bankAmount);
+                
                 const btn = document.getElementById('btnClaim');
                 if(bankAmount < 5) {
                     btn.disabled = true;
@@ -92,9 +129,12 @@
         function loadExistingLands() {
             onValue(ref(db, 'territories'), (snapshot) => {
                 const data = snapshot.val();
-                // Clear old visual elements
-                allPolygons.forEach(p => p.poly.setMap(null));
-                allPolygons = [];
+                
+                // Clear old visual elements if they exist
+                if(allPolygons.length > 0) {
+                    allPolygons.forEach(p => p.poly.setMap(null));
+                    allPolygons = [];
+                }
 
                 if (data) Object.values(data).forEach(t => {
                     // Determine Color
@@ -107,10 +147,10 @@
                         paths: t.coords,
                         fillColor: fillC, fillOpacity: 0.35, 
                         strokeColor: strokeC, strokeWeight: 1,
-                        map: map, clickable: false // Static view only
+                        map: map, clickable: false 
                     });
 
-                    // Store turf polygon for collision check logic
+                    // Store turf polygon for collision check
                     const tCoords = t.coords.map(c => [c.lng, c.lat]);
                     tCoords.push([t.coords[0].lng, t.coords[0].lat]);
                     allPolygons.push({ 
@@ -131,22 +171,22 @@
             const radiusMeters = Math.sqrt(bankAmount / Math.PI);
             const circleCoords = generateCircleCoords(lat, lng, radiusMeters);
 
-            // 2. Create Turf Object for New Land to check for overlaps
+            // 2. Create Turf Object for New Land
             const turfCoords = circleCoords.map(c => [c.lng, c.lat]);
             turfCoords.push([circleCoords[0].lng, circleCoords[0].lat]); 
             const newPoly = turf.polygon([turfCoords]);
 
-            // 3. Collision Check against ALL loaded polygons
+            // 3. Collision Check
             for(const existing of allPolygons) {
                 if (turf.intersect(newPoly, existing.turfPoly)) {
-                    alert("Cannot claim here! Area overlaps with existing territory (Yours or Enemy's). Move to empty space.");
+                    alert("Cannot claim here! Area overlaps with existing territory. Move to empty space.");
                     return;
                 }
             }
 
             if(!confirm(`Claim this location for ${Math.round(bankAmount)} m²?`)) return;
 
-            // 4. Save to Firebase
+            // 4. Save
             const updates = {};
             const newKey = push(ref(db, 'territories')).key;
             updates[`territories/${newKey}`] = {
@@ -157,7 +197,6 @@
             };
             updates[`users/${currentUser}/bankedArea`] = 0; 
             
-            // Add bonus credit points
             const userSnap = await get(ref(db, `users/${currentUser}`));
             const currentPoints = userSnap.val().creditPoints || 0;
             updates[`users/${currentUser}/creditPoints`] = currentPoints + 10;
@@ -183,7 +222,9 @@
             }
             return coords;
         }
+
+        // Start loading the map
+        loadGoogleMaps();
     </script>
-    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAzfoxuzRbmyrhGChfTEWB05xvyNRmvK3k&libraries=geometry&callback=initMap"></script>
 </body>
 </html>
