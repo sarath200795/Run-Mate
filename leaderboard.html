@@ -8,11 +8,9 @@
         body { font-family: 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; margin: 0; padding: 0; min-height: 100vh; }
         .header { background: linear-gradient(180deg, #1a0b0b 0%, #000 100%); padding: 20px; text-align: center; border-bottom: 2px solid #C5A059; }
         h1 { margin: 0; font-family: 'Cinzel', serif; color: #C5A059; font-size: 1.8rem; }
-        
         .tabs { display: flex; justify-content: center; background: #111; border-bottom: 1px solid #333; }
         .tab-btn { flex: 1; padding: 15px; background: none; border: none; color: #666; font-family: 'Cinzel', serif; font-weight: bold; font-size: 1rem; cursor: pointer; }
         .tab-btn.active { color: #C5A059; border-bottom: 3px solid #C5A059; background: #1a1a1a; }
-
         .list-container { max-width: 600px; margin: 20px auto; padding: 0 10px; }
         .rank-card { background: #1a1a1a; padding: 15px; border-radius: 6px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333; }
         .rank-info { display: flex; align-items: center; gap: 15px; }
@@ -20,190 +18,101 @@
         .rank-num.top3 { color: #FFD700; text-shadow: 0 0 10px rgba(255, 215, 0, 0.5); }
         .name { font-weight: bold; color: white; font-size: 1.1rem; }
         .sub { font-size: 0.8rem; color: #888; }
-        
         .action-btn { border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 0.8rem; transition: 0.2s; }
         .btn-invite { background: #00e676; color: black; }
         .btn-req { background: #C5A059; color: black; }
         .btn-disabled { background: #333; color: #555; cursor: default; }
-
         .back-link { display: block; text-align: center; margin: 30px; color: #888; text-decoration: none; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>Global Rankings</h1>
-    </div>
-
+    <div class="header"><h1>Global Rankings</h1></div>
     <div class="tabs">
         <button class="tab-btn active" onclick="switchTab('users')">Conquerors</button>
         <button class="tab-btn" onclick="switchTab('clans')">Empires</button>
     </div>
-
-    <div class="list-container" id="listArea">
-        <p style="text-align:center; color:#666; margin-top:20px;">Summoning records...</p>
-    </div>
-
+    <div class="list-container" id="listArea"><p style="text-align:center; color:#666; margin-top:20px;">Summoning records...</p></div>
     <a href="dashboard.html" class="back-link">← Return to Base</a>
-
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
         import { getDatabase, ref, get, set, push } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
-
         const firebaseConfig = { databaseURL: "https://runmate-cb328-default-rtdb.firebaseio.com/" };
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
         const currentUser = localStorage.getItem('currentUser');
-
-        let currentTab = 'users';
-        let myClanId = null;
-        let isLeader = false;
-
-        // Init: Check my status
+        let currentTab = 'users'; let myClanId = null; let isLeader = false;
         async function init() {
             if(!currentUser) window.location.href = 'index.html';
             const userSnap = await get(ref(db, `users/${currentUser}`));
             const userData = userSnap.val();
-            
             if(userData && userData.clan) {
                 myClanId = userData.clan;
                 const clanSnap = await get(ref(db, `clans/${myClanId}`));
-                if(clanSnap.val() && clanSnap.val().leader === currentUser) {
-                    isLeader = true;
-                }
+                if(clanSnap.val() && clanSnap.val().leader === currentUser) { isLeader = true; }
             }
             loadData();
         }
-
         window.switchTab = (tab) => {
             currentTab = tab;
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            event.target.classList.add('active');
-            loadData();
+            event.target.classList.add('active'); loadData();
         }
-
         async function loadData() {
             const list = document.getElementById('listArea');
             list.innerHTML = '<p style="text-align:center; margin-top:20px;">Loading...</p>';
-
             const terrSnap = await get(ref(db, 'territories'));
             const territories = terrSnap.val() || {};
-            
             if (currentTab === 'users') {
                 const usersSnap = await get(ref(db, 'users'));
                 const allUsers = usersSnap.val() || {};
-                
-                // Aggregate areas
                 const userScores = {};
                 Object.keys(allUsers).forEach(u => userScores[u] = 0);
-                Object.values(territories).forEach(t => {
-                    if(userScores[t.owner] !== undefined) userScores[t.owner] += (t.areaSize || 0);
-                });
-
+                Object.values(territories).forEach(t => { if(userScores[t.owner] !== undefined) userScores[t.owner] += (t.areaSize || 0); });
                 const sorted = Object.entries(userScores).sort((a,b) => b[1] - a[1]);
                 renderUsers(sorted, allUsers);
-
             } else {
-                // Clans Tab
                 const clansSnap = await get(ref(db, 'clans'));
                 const allClans = clansSnap.val() || {};
-                
                 const clanScores = {};
                 Object.keys(allClans).forEach(c => clanScores[c] = 0);
-                
-                // Map user to clan, then sum
                 const userToClan = {};
                 const usersSnap = await get(ref(db, 'users'));
                 const users = usersSnap.val() || {};
                 Object.keys(users).forEach(u => { if(users[u].clan) userToClan[u] = users[u].clan; });
-
-                Object.values(territories).forEach(t => {
-                    const c = userToClan[t.owner];
-                    if(c && clanScores[c] !== undefined) clanScores[c] += (t.areaSize || 0);
-                });
-
+                Object.values(territories).forEach(t => { const c = userToClan[t.owner]; if(c && clanScores[c] !== undefined) clanScores[c] += (t.areaSize || 0); });
                 const sorted = Object.entries(clanScores).sort((a,b) => b[1] - a[1]);
                 renderClans(sorted, allClans);
             }
         }
-
         function renderUsers(sortedData, allUsers) {
             const list = document.getElementById('listArea');
             list.innerHTML = sortedData.map((item, idx) => {
                 const [uid, score] = item;
                 const userObj = allUsers[uid];
                 const alreadyInMyClan = (userObj.clan === myClanId);
-                const hasClan = !!userObj.clan;
-                
-                // Invite Logic: Must be leader, target must not be in my clan
                 let actionBtn = "";
                 if (isLeader && uid !== currentUser && !alreadyInMyClan) {
                     const hasInvite = userObj.invites && userObj.invites[myClanId];
-                    actionBtn = `<button class="action-btn ${hasInvite ? 'btn-disabled' : 'btn-invite'}" 
-                        onclick="window.sendInvite('${uid}')" ${hasInvite ? 'disabled' : ''}>
-                        ${hasInvite ? 'Sent' : 'Invite'}
-                    </button>`;
+                    actionBtn = `<button class="action-btn ${hasInvite ? 'btn-disabled' : 'btn-invite'}" onclick="window.sendInvite('${uid}')" ${hasInvite ? 'disabled' : ''}>${hasInvite ? 'Sent' : 'Invite'}</button>`;
                 }
-
-                return `
-                <div class="rank-card">
-                    <div class="rank-info">
-                        <div class="rank-num ${idx<3 ? 'top3' : ''}">#${idx+1}</div>
-                        <div>
-                            <div class="name">${uid} ${uid===currentUser ? '(You)' : ''}</div>
-                            <div class="sub">${Math.round(score).toLocaleString()} m² • ${userObj.clan || 'Nomad'}</div>
-                        </div>
-                    </div>
-                    ${actionBtn}
-                </div>`;
+                return `<div class="rank-card"><div class="rank-info"><div class="rank-num ${idx<3 ? 'top3' : ''}">#${idx+1}</div><div><div class="name">${uid} ${uid===currentUser ? '(You)' : ''}</div><div class="sub">${Math.round(score).toLocaleString()} m² • ${userObj.clan || 'Nomad'}</div></div></div>${actionBtn}</div>`;
             }).join('');
         }
-
         function renderClans(sortedData, allClans) {
             const list = document.getElementById('listArea');
             list.innerHTML = sortedData.map((item, idx) => {
                 const [clanId, score] = item;
                 const clanObj = allClans[clanId];
-                
-                // Request Logic: I must have no clan
                 let actionBtn = "";
                 if (!myClanId) {
                     const hasReq = clanObj.requests && clanObj.requests[currentUser];
-                    actionBtn = `<button class="action-btn ${hasReq ? 'btn-disabled' : 'btn-req'}" 
-                        onclick="window.sendRequest('${clanId}')" ${hasReq ? 'disabled' : ''}>
-                        ${hasReq ? 'Pending' : 'Join Request'}
-                    </button>`;
-                } else if (clanId === myClanId) {
-                    actionBtn = `<span style="color:#00e676; font-size:0.8rem; font-weight:bold;">YOUR CLAN</span>`;
-                }
-
-                return `
-                <div class="rank-card">
-                    <div class="rank-info">
-                        <div class="rank-num ${idx<3 ? 'top3' : ''}">#${idx+1}</div>
-                        <div>
-                            <div class="name">${clanId}</div>
-                            <div class="sub">${Math.round(score).toLocaleString()} m² • Leader: ${clanObj.leader}</div>
-                        </div>
-                    </div>
-                    ${actionBtn}
-                </div>`;
+                    actionBtn = `<button class="action-btn ${hasReq ? 'btn-disabled' : 'btn-req'}" onclick="window.sendRequest('${clanId}')" ${hasReq ? 'disabled' : ''}>${hasReq ? 'Pending' : 'Join Request'}</button>`;
+                } else if (clanId === myClanId) { actionBtn = `<span style="color:#00e676; font-size:0.8rem; font-weight:bold;">YOUR CLAN</span>`; }
+                return `<div class="rank-card"><div class="rank-info"><div class="rank-num ${idx<3 ? 'top3' : ''}">#${idx+1}</div><div><div class="name">${clanId}</div><div class="sub">${Math.round(score).toLocaleString()} m² • Leader: ${clanObj.leader}</div></div></div>${actionBtn}</div>`;
             }).join('');
         }
-
-        // Global Window Actions
-        window.sendInvite = async (targetId) => {
-            if(!confirm(`Invite ${targetId}?`)) return;
-            await set(ref(db, `users/${targetId}/invites/${myClanId}`), true);
-            loadData(); // refresh UI
-        };
-
-        window.sendRequest = async (targetClan) => {
-            if(!confirm(`Request to join ${targetClan}?`)) return;
-            await set(ref(db, `clans/${targetClan}/requests/${currentUser}`), true);
-            await set(ref(db, `users/${currentUser}/pendingClan`), targetClan);
-            loadData();
-        };
-
+        window.sendInvite = async (targetId) => { if(!confirm(`Invite ${targetId}?`)) return; await set(ref(db, `users/${targetId}/invites/${myClanId}`), true); loadData(); };
+        window.sendRequest = async (targetClan) => { if(!confirm(`Request to join ${targetClan}?`)) return; await set(ref(db, `clans/${targetClan}/requests/${currentUser}`), true); await set(ref(db, `users/${currentUser}/pendingClan`), targetClan); loadData(); };
         init();
     </script>
 </body>
