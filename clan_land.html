@@ -15,11 +15,15 @@
         #map { flex: 1; min-height: 40%; width: 100%; border-bottom: 2px solid #333; }
 
         .list-container { flex: 1; overflow-y: auto; padding: 20px; background: #1a1a1a; }
-        .land-item { background: #222; margin-bottom: 10px; padding: 15px; border-radius: 8px; border-left: 4px solid #00bcd4; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .land-item { background: #222; margin-bottom: 10px; padding: 15px; border-radius: 8px; border-left: 4px solid #444; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
         .land-item:hover { background: #2a2a2a; }
         
+        /* Specific Border Colors */
+        .land-item.mine { border-left-color: #00e676; }
+        .land-item.ally { border-left-color: #00bcd4; }
+
         .land-info { display: flex; flex-direction: column; }
-        .owner-name { font-weight: bold; color: #00bcd4; font-size: 0.9rem; }
+        .owner-name { font-weight: bold; font-size: 0.9rem; }
         .land-area { font-weight: bold; color: white; font-size: 1.1rem; display: flex; align-items: center; gap: 8px; }
         .guard-badge { background: #003333; color: #00bcd4; font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; border: 1px solid #00bcd4; display: flex; align-items: center; gap: 4px; }
 
@@ -33,6 +37,12 @@
         
         .guard-section { background: #222; padding: 15px; border-radius: 6px; margin-top: 15px; border: 1px solid #444; }
         .guard-title { color: #FFD700; font-weight: bold; margin-bottom: 10px; display: block; font-family: 'Cinzel', serif; }
+        
+        /* Slider Styles */
+        .range-container { margin: 15px 0; text-align: left; }
+        input[type=range] { width: 100%; margin: 10px 0; accent-color: #00bcd4; }
+        .range-labels { display: flex; justify-content: space-between; font-size: 0.8rem; color: #888; }
+
         .btn-deploy { background: #00bcd4; color: black; border: none; padding: 12px; width: 100%; font-weight: bold; cursor: pointer; border-radius: 4px; margin-top: 10px; font-size: 1rem; }
         .btn-deploy:disabled { background: #444; color: #888; cursor: not-allowed; }
         .btn-close { background: none; border: 1px solid #666; color: #888; padding: 8px; width: 100%; margin-top: 10px; cursor: pointer; border-radius: 4px; }
@@ -54,9 +64,9 @@
 
     <div id="detailModal" class="modal">
         <div class="detail-content modal-content">
-            <h2>Reinforce Ally</h2>
+            <h2>Reinforce Territory</h2>
             <div class="detail-row"><span class="detail-lbl">Owner:</span><span class="detail-val" id="dOwner">...</span></div>
-            <div class="detail-row"><span class="detail-lbl">Area Size:</span><span class="detail-val" id="dArea">...</span></div>
+            <div class="detail-row"><span class="detail-lbl">Total Area:</span><span class="detail-val" id="dArea">...</span></div>
             <div class="detail-row"><span class="detail-lbl">Location:</span><span class="detail-val" id="dLoc" style="font-size:0.8rem; max-width:60%; text-align:right;">Fetching...</span></div>
             
             <div class="guard-section" id="guardControl">
@@ -64,11 +74,24 @@
                 <div id="guardStatusText" style="color:#aaa; font-size:0.9rem; margin-bottom:10px;">Unprotected</div>
                 
                 <div id="deployUI">
-                    <div style="font-size:0.8rem; color:#aaa; margin-bottom:5px;">(1 Guard per 250m² for Allies)</div>
-                    <div class="detail-row"><span class="detail-lbl">Guards Required:</span><span class="detail-val" id="gReq">0</span></div>
-                    <div class="detail-row"><span class="detail-lbl">Cost (10pts/Guard):</span><span class="detail-val" id="gCost" style="color:#FFD700">0</span></div>
+                    <div style="font-size:0.8rem; color:#aaa; margin-bottom:5px;">(1 Guard covers 250m² for Allies)</div>
+                    
+                    <div class="range-container">
+                        <label>Deploy Guards: <span id="guardCountDisplay" style="color:#00bcd4; font-weight:bold; font-size:1.1rem;">1</span></label>
+                        <input type="range" id="guardSlider" min="1" max="10" value="1" step="1">
+                        <div class="range-labels">
+                            <span>Min: 1</span>
+                            <span id="maxGuardLabel">Max</span>
+                        </div>
+                    </div>
+
+                    <div class="detail-row"><span class="detail-lbl">Coverage:</span><span class="detail-val" id="gCoverage" style="color:#00e676">250 m²</span></div>
+                    <div class="detail-row"><span class="detail-lbl">Unprotected:</span><span class="detail-val" id="gExposed" style="color:#ff4444">0 m²</span></div>
+                    <div class="detail-row"><span class="detail-lbl">Cost (10pts/ea):</span><span class="detail-val" id="gCost" style="color:#FFD700">10 Pts</span></div>
+                    
                     <button id="btnDeploy" class="btn-deploy">DEPLOY GUARDS</button>
                 </div>
+                
                 <div id="activeGuardUI" style="display:none; color:#00bcd4; font-weight:bold; padding:10px;">
                     ✅ ALLY SECURED<br>
                     <span style="font-size:0.8rem; color:#aaa; font-weight:normal;">Expires: <span id="gExpiry"></span></span>
@@ -134,7 +157,6 @@
         async function loadClanLands() {
             if(!myClanId) return;
             
-            // Get Clan Members
             const clanSnap = await get(child(ref(db), `clans/${myClanId}/members`));
             const members = clanSnap.val() || {};
             
@@ -151,7 +173,6 @@
                 let hasLands = false;
 
                 if (data) {
-                    // Filter lands owned by clan members
                     const clanLands = Object.entries(data).filter(([k, v]) => members[v.owner]);
                     
                     if(clanLands.length === 0) {
@@ -165,9 +186,10 @@
                         hasLands = true;
                         totalArea += (t.areaSize || 0);
 
-                        // Colors: Cyan for Clan
-                        const color = '#00bcd4';
-                        const stroke = '#00838f';
+                        // --- 1. DIFFERENTIATE COLORS ---
+                        const isMine = (t.owner === currentUser);
+                        const color = isMine ? '#00e676' : '#00bcd4'; // Green for me, Cyan for allies
+                        const stroke = isMine ? '#004d26' : '#00838f';
 
                         const poly = new google.maps.Polygon({
                             paths: t.coords,
@@ -180,7 +202,6 @@
                         mapOverlays.push(poly);
                         t.coords.forEach(c => bounds.extend(c));
 
-                        // Guard Status
                         let guardHtml = "";
                         const now = Date.now();
                         if (t.guarded && t.guardExpiry > now) {
@@ -201,11 +222,15 @@
                             mapOverlays.push(marker);
                         }
 
+                        const itemClass = isMine ? 'mine' : 'ally';
+                        const ownerDisplay = isMine ? `${t.owner} (You)` : t.owner;
+                        const ownerColor = isMine ? '#00e676' : '#00bcd4';
+
                         const div = document.createElement('div');
-                        div.className = `land-item`;
+                        div.className = `land-item ${itemClass}`;
                         div.innerHTML = `
                             <div class="land-info">
-                                <span class="owner-name">${t.owner}</span>
+                                <span class="owner-name" style="color:${ownerColor}">${ownerDisplay}</span>
                                 <span class="land-area">${Math.round(t.areaSize)} m² ${guardHtml}</span>
                             </div>
                             <div style="font-size:1.2rem; color:#444;">❯</div>
@@ -235,7 +260,6 @@
             document.getElementById('dOwner').innerText = t.owner;
             document.getElementById('dArea').innerText = Math.round(selectedLandArea) + " m²";
             
-            // Guard Logic for Clan (Different calculation)
             const isGuarded = t.guarded && (t.guardExpiry > Date.now());
             if (isGuarded) {
                 document.getElementById('deployUI').style.display = 'none';
@@ -249,25 +273,22 @@
                 document.getElementById('guardStatusText').innerText = "VULNERABLE";
                 document.getElementById('guardStatusText').style.color = "#ff4444";
 
-                // CLAN RULE: 1 Guard covers 250m²
-                const guardsNeeded = selectedLandArea / 250;
-                const cost = Math.ceil(guardsNeeded * 10);
-
-                document.getElementById('gReq').innerText = guardsNeeded.toFixed(2);
-                document.getElementById('gCost').innerText = cost + " Pts";
+                // --- 2. FLEXIBLE GUARD DEPLOYMENT ---
+                // Rule: 1 Guard covers 250m² for allies
+                const maxGuardsNeeded = Math.ceil(selectedLandArea / 250);
                 
-                const btn = document.getElementById('btnDeploy');
-                btn.onclick = deployGuards; 
+                const slider = document.getElementById('guardSlider');
+                slider.max = maxGuardsNeeded;
+                slider.value = maxGuardsNeeded; // Default to full coverage
+                document.getElementById('maxGuardLabel').innerText = "Max: " + maxGuardsNeeded;
 
-                if (currentPoints < cost) {
-                    btn.disabled = true;
-                    btn.innerText = "NOT ENOUGH POINTS";
-                    btn.style.background = "#444";
-                } else {
-                    btn.disabled = false;
-                    btn.innerText = `DEPLOY (${cost} PTS)`;
-                    btn.style.background = "#00bcd4";
-                }
+                // Initialize Update
+                updateDeployCalc(maxGuardsNeeded);
+
+                // Listener for changes
+                slider.oninput = function() {
+                    updateDeployCalc(this.value);
+                };
             }
 
             const center = getPolygonCenter(t.coords);
@@ -280,24 +301,49 @@
             } catch (e) { document.getElementById('dLoc').innerText = "Unknown Location"; }
         }
 
-        async function deployGuards() {
+        function updateDeployCalc(count) {
+            const guardedArea = count * 250;
+            const exposed = Math.max(0, selectedLandArea - guardedArea);
+            const cost = count * 10;
+
+            document.getElementById('guardCountDisplay').innerText = count;
+            document.getElementById('gCoverage').innerText = Math.round(Math.min(guardedArea, selectedLandArea)) + " m²";
+            document.getElementById('gExposed').innerText = Math.round(exposed) + " m²";
+            document.getElementById('gCost').innerText = cost + " Pts";
+
+            const btn = document.getElementById('btnDeploy');
+            btn.onclick = () => deployGuards(count, cost); // Bind with current values
+
+            if (currentPoints < cost) {
+                btn.disabled = true;
+                btn.innerText = "NOT ENOUGH POINTS";
+                btn.style.background = "#444";
+            } else {
+                btn.disabled = false;
+                btn.innerText = `DEPLOY (${cost} PTS)`;
+                btn.style.background = "#00bcd4";
+            }
+        }
+
+        async function deployGuards(count, cost) {
             if(!selectedLandId) return;
-            // Re-calculate to be safe
-            const guardsNeeded = selectedLandArea / 250; // Clan Rate
-            const cost = Math.ceil(guardsNeeded * 10);
 
             if(currentPoints < cost) return alert("Insufficient Credit Points!");
 
-            if(!confirm(`Deploy ${guardsNeeded.toFixed(2)} Guards for ally? Cost: ${cost} Pts.\nProtects area for 7 Days.`)) return;
+            // Calculate percentage coverage for confirmation msg
+            const coveragePct = Math.min(100, Math.round((count * 250 / selectedLandArea) * 100));
+
+            if(!confirm(`Deploy ${count} Guards?\nCost: ${cost} Pts.\nCoverage: ${coveragePct}% of territory.`)) return;
 
             const updates = {};
             updates[`territories/${selectedLandId}/guarded`] = true;
+            updates[`territories/${selectedLandId}/guardCount`] = parseInt(count); // Save specific count
             updates[`territories/${selectedLandId}/guardExpiry`] = Date.now() + (7 * 24 * 60 * 60 * 1000); 
             updates[`users/${currentUser}/creditPoints`] = currentPoints - cost;
 
             try {
                 await update(ref(db), updates);
-                alert("Guards Deployed! Ally territory secured.");
+                alert("Guards Deployed! Territory reinforced.");
                 document.getElementById('detailModal').style.display = 'none';
             } catch(e) {
                 alert("Error: " + e.message);
