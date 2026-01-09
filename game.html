@@ -44,6 +44,7 @@
         button { padding: 15px; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: bold; cursor: pointer; font-family: 'Cinzel', serif; text-transform: uppercase; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         #startBtn { background: linear-gradient(180deg, #00e676, #00c853); color: #003300; }
         
+        /* Updated Stop Button for Dynamic Feedback */
         #stopBtn { background: linear-gradient(180deg, #ff1744, #d50000); color: white; display: none; transition: 0.3s; }
         #stopBtn.ready { background: linear-gradient(180deg, #FFD700, #B8860B); color: black; animation: pulse 2s infinite; border: 2px solid #fff; }
 
@@ -158,9 +159,8 @@
 
         window.logout = function() { if(confirm("Logout?")) { localStorage.clear(); window.location.href = 'index.html'; }};
         
-        // --- IMPORTANT: GLOBAL MAP INIT FUNCTION ---
+        // --- 1. GLOBAL INITMAP DEFINITION ---
         window.initMap = function() {
-            console.log("Map initialized called.");
             const mapEl = document.getElementById("map");
             if (!mapEl) return;
 
@@ -179,13 +179,11 @@
             }
         };
 
-        // --- ROBUST LOADER ---
+        // --- 2. DYNAMIC SCRIPT LOADER ---
         function loadGoogleMaps() {
             if (window.google && window.google.maps) {
-                // If map API is already loaded (from cache or previous page), just init
                 window.initMap();
             } else if (!document.getElementById('google-maps-script')) {
-                // Otherwise inject script
                 const script = document.createElement('script');
                 script.id = 'google-maps-script';
                 script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_API_KEY}&libraries=geometry&callback=initMap`;
@@ -210,6 +208,7 @@
                 document.getElementById('modeHelper').innerText = "💡 Tap Green/Gold territories to deploy guards";
                 document.getElementById('startBtn').innerText = "⚔️ Start Conquest";
                 document.getElementById('stopBtn').innerText = "🚩 Claim Territory";
+                
                 if(map) google.maps.event.trigger(map, "resize");
             } else {
                 document.getElementById('btnModeIn').classList.add('active');
@@ -354,9 +353,16 @@
             stopBtn.innerText = "🚩 Claim Territory (0 m²)";
             stopBtn.classList.remove('ready'); 
             
+            // --- OUTDOOR START LOGIC ---
             if (gameMode === 'outdoor') {
                 activePolyline = new google.maps.Polyline({ path: [], strokeColor: "#FFFF00", strokeWeight: 6, map: map });
                 watchId = navigator.geolocation.watchPosition(pos => {
+                    // SPEED CHECK
+                    const speed = pos.coords.speed; // m/s
+                    if (speed !== null && speed > 3.89) { // > 14 km/h
+                         showToast("⛔ MOVING TOO FAST! Vehicle detected. Capture may be invalid.", true);
+                    }
+
                     const latLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                     pathCoords.push(latLng); 
                     activePolyline.getPath().push(new google.maps.LatLng(latLng.lat, latLng.lng));
@@ -376,10 +382,20 @@
 
                     checkGuardProximity(latLng);
                 }, err => console.error(err), { enableHighAccuracy: true });
+            
             } else {
+                // --- INDOOR START LOGIC ---
                 indoorDistance = 0; lastIndoorPos = null;
-                document.getElementById('indDistLarge').innerText = "0"; document.getElementById('indAreaLarge').innerText = "0 m²";
+                document.getElementById('indDistLarge').innerText = "0"; 
+                document.getElementById('indAreaLarge').innerText = "0 m²";
+                
                 watchId = navigator.geolocation.watchPosition(pos => {
+                    // SPEED CHECK FOR INDOOR AS WELL
+                    const speed = pos.coords.speed;
+                    if (speed !== null && speed > 3.89) {
+                         showToast("⛔ MOVING TOO FAST! Vehicle detected.", true);
+                    }
+
                     const latLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                     if (lastIndoorPos) {
                         const from = new google.maps.LatLng(lastIndoorPos.lat, lastIndoorPos.lng);
@@ -389,8 +405,19 @@
                             indoorDistance += dist;
                             const r = indoorDistance / (2 * Math.PI);
                             const area = Math.PI * r * r;
+                            
+                            // UPDATE UI
                             document.getElementById('indDistLarge').innerText = Math.round(indoorDistance);
                             document.getElementById('indAreaLarge').innerText = Math.round(area) + " m²";
+                            
+                            // UPDATE BUTTON FEEDBACK
+                            stopBtn.innerText = `💾 Bank Area (${Math.round(area)} m²)`;
+                            if (area >= 1000) {
+                                stopBtn.classList.add('ready');
+                                stopBtn.innerText = `🏆 BANK VICTORY (${Math.round(area)} m²)`;
+                            } else {
+                                stopBtn.classList.remove('ready');
+                            }
                         }
                     }
                     lastIndoorPos = latLng;
@@ -398,7 +425,6 @@
             }
         });
 
-        // CREDIT POINT LOGIC (1-2-4-6-5-8)
         function calculateNewPoints(streakDay) {
             if (streakDay === 1) return 1;
             if (streakDay === 2) return 2;
@@ -413,7 +439,7 @@
             const btn = document.getElementById('stopBtn');
             const startBtn = document.getElementById('startBtn');
 
-            // --- INDOOR LOGIC ---
+            // --- INDOOR STOP LOGIC ---
             if (gameMode === 'indoor') {
                 navigator.geolocation.clearWatch(watchId);
                 const r = indoorDistance / (2 * Math.PI);
@@ -427,7 +453,6 @@
                 const updates = {};
                 updates[`users/${currentUser}/bankedArea`] = (bankedArea || 0) + finalArea;
 
-                // Credit Point Calculation (Indoor)
                 let pointMsg = "";
                 if (finalArea >= 1000) {
                     const now = new Date(); const todayStr = now.toDateString(); const lastDate = lastConquestDate ? new Date(lastConquestDate) : null;
@@ -451,7 +476,7 @@
                 return;
             }
 
-            // --- OUTDOOR LOGIC ---
+            // --- OUTDOOR STOP LOGIC ---
             if (pathCoords.length < 3) { 
                 alert("Path too short."); 
                 navigator.geolocation.clearWatch(watchId);
@@ -537,7 +562,6 @@
                         }
                     }
 
-                    // Credit Point Logic (Outdoor)
                     let pointMsg = "";
                     if (finalMyArea >= 1000) {
                         const now = new Date();
@@ -626,7 +650,7 @@
             });
         }
 
-        // --- TRIGGER LOAD ---
+        // --- LOAD GOOGLE MAPS DYNAMICALLY ---
         loadGoogleMaps();
     </script>
 </body>
