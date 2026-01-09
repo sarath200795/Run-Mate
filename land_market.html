@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Land Market</title>
+    <title>Land Market - Capture Mode</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
@@ -10,15 +10,19 @@
         .header { background: #111; padding: 15px; border-bottom: 2px solid #C5A059; text-align: center; color: white; display:flex; justify-content:space-between; align-items:center; }
         .bank-display { color: #FFD700; font-weight: bold; font-size: 1.1rem; border: 1px solid #C5A059; padding: 5px 10px; border-radius: 4px; }
         #map { flex: 1; position: relative; background: #e0e0e0; }
+        /* Crosshair */
         .crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; pointer-events: none; z-index: 10; opacity: 0.8; }
+        /* Controls */
         .controls { padding: 15px; background: #111; border-top: 1px solid #333; text-align: center; }
         .btn-claim { background: #C5A059; color: black; border: none; padding: 15px 30px; font-weight: bold; font-family: 'Cinzel', serif; font-size: 1.1rem; border-radius: 4px; cursor: pointer; width: 100%; max-width: 300px; transition: background 0.3s; }
-        .btn-claim.confirm { background: #00e676; color: #003300; animation: pulse 1.5s infinite; }
+        .btn-claim.confirm { background: #d32f2f; color: white; animation: pulse 1.5s infinite; } /* Red for Attack/Confirm */
         .btn-back { background: none; border: 1px solid #555; color: #888; padding: 5px 10px; font-size: 0.8rem; cursor: pointer; border-radius: 4px; }
+        /* Legend */
         .legend { position: absolute; bottom: 140px; left: 10px; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 4px; font-size: 0.8rem; color: #ccc; pointer-events: none; z-index: 5; }
         .legend-item { display: flex; align-items: center; margin-bottom: 5px; }
         .color-box { width: 15px; height: 15px; margin-right: 8px; border: 1px solid #fff; }
-        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(0, 230, 118, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(0, 230, 118, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 230, 118, 0); } }
+        
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(211, 47, 47, 0); } 100% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0); } }
     </style>
 </head>
 <body>
@@ -31,8 +35,9 @@
     <div id="map">
         <div class="legend">
             <div class="legend-item"><div class="color-box" style="background:#00e676; opacity:0.6;"></div>Your Land</div>
-            <div class="legend-item"><div class="color-box" style="background:#888; opacity:0.6;"></div>Occupied</div>
-            <div class="legend-item"><div class="color-box" style="background:#FFD700; opacity:0.6; border:1px dashed white;"></div>Preview</div>
+            <div class="legend-item"><div class="color-box" style="background:#2196F3; opacity:0.6;"></div>Ally (Clan)</div>
+            <div class="legend-item"><div class="color-box" style="background:#F44336; opacity:0.6;"></div>Enemy</div>
+            <div class="legend-item"><div class="color-box" style="background:#FFD700; opacity:0.6; border:1px dashed white;"></div>Target</div>
         </div>
         <svg class="crosshair" viewBox="0 0 100 100">
             <line x1="50" y1="0" x2="50" y2="100" stroke="#000" stroke-width="2" />
@@ -42,8 +47,8 @@
     </div>
 
     <div class="controls">
-        <div style="color:#888; font-size:0.9rem; margin-bottom:10px;">Drag map to target. Preview to check fit.</div>
-        <button class="btn-claim" id="btnClaim">PREVIEW AREA</button>
+        <div style="color:#888; font-size:0.9rem; margin-bottom:10px;">Target Enemy lands to capture overlap.</div>
+        <button class="btn-claim" id="btnClaim">PREVIEW TARGET</button>
     </div>
 
     <script type="module">
@@ -59,10 +64,11 @@
         if (!currentUser) window.location.href = 'index.html';
 
         let map, bankAmount = 0;
-        let allPolygons = []; 
-        let previewPolygon = null; // Stores the visual preview
-        let previewCoords = null;  // Stores the coordinates for submission
-        let isPreviewMode = false; // Tracks state
+        let myClanId = null;
+        let allPolygons = []; // Format: { id, owner, clan, turfPoly, googlePoly, rawCoords }
+        let previewPolygon = null; 
+        let previewCoords = null;  
+        let isPreviewMode = false; 
 
         window.initMap = function() {
             const mapEl = document.getElementById("map");
@@ -78,7 +84,6 @@
                     });
                 } else { map.setCenter({ lat: 40.7128, lng: -74.0060 }); }
 
-                // RESET PREVIEW ON MAP MOVE
                 map.addListener('center_changed', () => {
                     if (isPreviewMode) resetPreview();
                 });
@@ -100,7 +105,10 @@
         function loadUserData() {
             onValue(ref(db, `users/${currentUser}`), (snap) => {
                 const val = snap.val();
-                bankAmount = val ? (val.bankedArea || 0) : 0;
+                if(val) {
+                    bankAmount = val.bankedArea || 0;
+                    myClanId = val.clanId || null; // Capture user's clan
+                }
                 document.getElementById('bankVal').innerText = Math.round(bankAmount);
                 checkButtonState();
             });
@@ -116,7 +124,7 @@
             } else if (!isPreviewMode) {
                 btn.disabled = false; 
                 btn.style.background = "#C5A059"; 
-                btn.innerText = "PREVIEW AREA";
+                btn.innerText = "PREVIEW TARGET";
                 btn.classList.remove('confirm');
             }
         }
@@ -130,101 +138,200 @@
             isPreviewMode = false;
             
             const btn = document.getElementById('btnClaim');
-            btn.innerText = "PREVIEW AREA";
+            btn.innerText = "PREVIEW TARGET";
             btn.style.background = "#C5A059";
             btn.classList.remove('confirm');
         }
 
+        // --- LOAD LANDS WITH OWNER INFO ---
         function loadExistingLands() {
             onValue(ref(db, 'territories'), (snapshot) => {
                 const data = snapshot.val();
-                if(allPolygons.length > 0) { allPolygons.forEach(p => p.poly.setMap(null)); allPolygons = []; }
-                if (data) Object.values(data).forEach(t => {
-                    const isMine = t.owner === currentUser;
-                    const fillC = isMine ? '#00e676' : '#555555';
-                    const strokeC = isMine ? '#004d26' : '#222222';
-                    const zIdx = isMine ? 10 : 1;
-                    const poly = new google.maps.Polygon({
-                        paths: t.coords, fillColor: fillC, fillOpacity: 0.5, strokeColor: strokeC, strokeWeight: 2, zIndex: zIdx, map: map, clickable: false 
+                
+                // Cleanup old map objects
+                if(allPolygons.length > 0) { 
+                    allPolygons.forEach(p => p.googlePoly.setMap(null)); 
+                    allPolygons = []; 
+                }
+
+                if (data) {
+                    Object.entries(data).forEach(([key, t]) => {
+                        // Determine Color based on Relationship
+                        let fillC, strokeC;
+                        const isMine = t.owner === currentUser;
+                        const isAlly = !isMine && myClanId && t.clanId === myClanId; // Check clan
+
+                        if (isMine) { fillC = '#00e676'; strokeC = '#004d26'; }
+                        else if (isAlly) { fillC = '#2196F3'; strokeC = '#0D47A1'; } // Ally Blue
+                        else { fillC = '#F44336'; strokeC = '#B71C1C'; } // Enemy Red
+
+                        const zIdx = isMine ? 10 : 1;
+                        
+                        // Create Visual Polygon
+                        const poly = new google.maps.Polygon({
+                            paths: t.coords, fillColor: fillC, fillOpacity: 0.5, strokeColor: strokeC, strokeWeight: 2, zIndex: zIdx, map: map, clickable: false 
+                        });
+
+                        // Create Turf Polygon for Math
+                        // Ensure closed loop
+                        const tCoords = t.coords.map(c => [c.lng, c.lat]);
+                        if (tCoords.length > 0 && (tCoords[0][0] !== tCoords[tCoords.length-1][0] || tCoords[0][1] !== tCoords[tCoords.length-1][1])) {
+                            tCoords.push(tCoords[0]);
+                        }
+                        
+                        let turfPoly = turf.polygon([tCoords]);
+                        // Fix Winding direction for accurate math
+                        turfPoly = turf.rewind(turfPoly);
+
+                        allPolygons.push({ 
+                            id: key, 
+                            owner: t.owner, 
+                            clan: t.clanId || null,
+                            turfPoly: turfPoly, 
+                            googlePoly: poly,
+                            rawCoords: t.coords
+                        });
                     });
-                    const tCoords = t.coords.map(c => [c.lng, c.lat]);
-                    tCoords.push([t.coords[0].lng, t.coords[0].lat]);
-                    allPolygons.push({ turfPoly: turf.polygon([tCoords]), poly: poly });
-                });
+                }
             });
         }
 
+        // --- MAIN BUTTON LOGIC ---
         document.getElementById('btnClaim').addEventListener('click', async () => {
             if(bankAmount < 5) return;
-
             const btn = document.getElementById('btnClaim');
 
-            // --- STEP 1: PREVIEW ---
+            // --- STEP 1: PREVIEW (VALIDATION) ---
             if (!isPreviewMode) {
                 const center = map.getCenter();
-                const lat = center.lat();
-                const lng = center.lng();
                 const radiusMeters = Math.sqrt(bankAmount / Math.PI);
                 
-                // Generate Coords
-                previewCoords = generateCircleCoords(lat, lng, radiusMeters);
+                // 1. Generate Circle
+                previewCoords = generateCircleCoords(center.lat(), center.lng(), radiusMeters);
                 
-                // Turf Check
+                // 2. Convert to Turf for Checking
                 const turfCoords = previewCoords.map(c => [c.lng, c.lat]);
                 turfCoords.push([previewCoords[0].lng, previewCoords[0].lat]); 
                 const newPoly = turf.polygon([turfCoords]);
 
+                // 3. CHECK OVERLAPS
+                let touchesEnemy = false;
+
                 for(const existing of allPolygons) {
-                    if (turf.intersect(newPoly, existing.turfPoly)) { 
-                        alert("⚠️ Area blocked! The preview overlaps with existing territory. Move the map."); 
-                        return; 
+                    if (turf.booleanIntersects(newPoly, existing.turfPoly)) { 
+                        
+                        // FAIL: Touching Self
+                        if (existing.owner === currentUser) {
+                            alert("⚠️ Blocked! You cannot overlap your own land."); 
+                            return; 
+                        }
+                        // FAIL: Touching Ally (Clan)
+                        if (myClanId && existing.clan === myClanId) {
+                            alert("⚠️ Blocked! You cannot steal land from your Clan Ally."); 
+                            return;
+                        }
+
+                        // ALLOW: Touching Enemy
+                        touchesEnemy = true;
                     }
                 }
 
-                // Draw Preview
+                // 4. Draw Preview
                 previewPolygon = new google.maps.Polygon({
                     paths: previewCoords,
                     fillColor: "#FFD700",
                     fillOpacity: 0.4,
                     strokeColor: "#FFD700",
                     strokeWeight: 2,
-                    strokeOpacity: 0.8,
                     map: map,
                     clickable: false
                 });
 
-                // Change State
+                // 5. Update UI
                 isPreviewMode = true;
-                btn.innerText = "CONFIRM CLAIM";
+                if(touchesEnemy) {
+                    btn.innerText = "ATTACK & CLAIM"; // Change text for aggression
+                } else {
+                    btn.innerText = "CONFIRM CLAIM";
+                }
                 btn.classList.add('confirm');
                 return;
             }
 
-            // --- STEP 2: CAPTURE ---
+            // --- STEP 2: EXECUTION (CALCULATION & DB UPDATE) ---
             if (isPreviewMode && previewCoords) {
-                // Double check (redundant but safe)
                 if(!confirm(`Finalize capture of ${Math.round(bankAmount)} m²?`)) return;
 
                 const updates = {};
+                
+                // A. CREATE MY NEW LAND
                 const newKey = push(ref(db, 'territories')).key;
+                
+                // Prepare turf poly of my new shape for math
+                const myTurfCoords = previewCoords.map(c => [c.lng, c.lat]);
+                myTurfCoords.push(myTurfCoords[0]);
+                const myTurfPoly = turf.polygon([myTurfCoords]);
+
                 updates[`territories/${newKey}`] = { 
                     owner: currentUser, 
+                    clanId: myClanId || null,
                     coords: previewCoords, 
                     areaSize: bankAmount, 
                     timestamp: Date.now(), 
                     source: 'Market' 
                 };
+
+                // B. DEDUCT POINTS/BANK
                 updates[`users/${currentUser}/bankedArea`] = 0; 
-                
-                // Bonus Points
+
+                // C. PROCESS ENEMY CUTS
+                let enemiesHit = 0;
+
+                allPolygons.forEach(target => {
+                    // Check intersection again to be safe
+                    if (turf.booleanIntersects(myTurfPoly, target.turfPoly)) {
+                        
+                        // Calculate Difference: Enemy - MyNewShape
+                        const diff = turf.difference(target.turfPoly, myTurfPoly);
+
+                        if (!diff) {
+                            // Result is null/undefined = Fully Consumed
+                            updates[`territories/${target.id}`] = null; // DELETE
+                            enemiesHit++;
+                        } else {
+                            // Result exists = Partial Cut
+                            // Turf might return Polygon or MultiPolygon. 
+                            // For simplicity, we convert the geometry back to Google Maps format.
+                            const geometryType = diff.geometry.type;
+                            
+                            if (geometryType === 'Polygon') {
+                                const newCoords = diff.geometry.coordinates[0].map(pt => ({ lat: pt[1], lng: pt[0] }));
+                                // Remove closing point for Google Maps cleanliness (optional but good)
+                                newCoords.pop(); 
+                                updates[`territories/${target.id}/coords`] = newCoords;
+                                enemiesHit++;
+                            } else if (geometryType === 'MultiPolygon') {
+                                // Logic: Enemy split into islands. 
+                                // Simple Handling: Keep the largest island, lose the small fragments (or create new nodes).
+                                // For this prototype, we take the first/largest piece.
+                                const newCoords = diff.geometry.coordinates[0][0].map(pt => ({ lat: pt[1], lng: pt[0] }));
+                                newCoords.pop();
+                                updates[`territories/${target.id}/coords`] = newCoords;
+                                enemiesHit++;
+                            }
+                        }
+                    }
+                });
+
+                // Bonus Points if attacking
                 const userSnap = await get(ref(db, `users/${currentUser}`));
                 const currentPoints = userSnap.val().creditPoints || 0;
-                updates[`users/${currentUser}/creditPoints`] = currentPoints + 10;
+                updates[`users/${currentUser}/creditPoints`] = currentPoints + 10 + (enemiesHit * 50);
 
                 try { 
                     await update(ref(db), updates); 
-                    resetPreview(); // Clear preview
-                    alert("Territory Claimed Successfully!"); 
+                    resetPreview(); 
+                    alert(enemiesHit > 0 ? "⚔️ Victory! Enemy territory captured." : "Territory Claimed Successfully!"); 
                     window.location.href = 'dashboard.html'; 
                 } catch(e) { 
                     alert("Error: " + e.message); 
