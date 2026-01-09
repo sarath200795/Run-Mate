@@ -98,6 +98,10 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
         import { getDatabase, ref, push, update, onValue, get, child, runTransaction } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+        
+        // --- 1. DEFINE API KEY ---
+        const GOOGLE_API_KEY = "AIzaSyAzfoxuzRbmyrhGChfTEWB05xvyNRmvK3k";
+
         const firebaseConfig = { databaseURL: "https://runmate-cb328-default-rtdb.firebaseio.com/" };
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
@@ -153,8 +157,12 @@
             if (area >= 100) return "🌾 FARMER";
             return "🪵 PEASANT";
         }
+
+        // --- 2. GLOBAL INITMAP DEFINITION ---
         window.initMap = function() {
-            map = new google.maps.Map(document.getElementById("map"), {
+            const mapEl = document.getElementById("map");
+            if(!mapEl) return;
+            map = new google.maps.Map(mapEl, {
                 zoom: 19, center: { lat: 0, lng: 0 }, mapTypeId: 'terrain', disableDefaultUI: true,
                 styles: [{ elementType: "geometry", stylers: [{ color: "#242f3e" }] }, { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] }, { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] }, { featureType: "road", elementType: "geometry", stylers: [{ color: "#38414e" }] }]
             });
@@ -167,6 +175,18 @@
                 }, err => console.error(err), { enableHighAccuracy: true });
             }
         };
+
+        // --- 3. DYNAMIC SCRIPT LOADER ---
+        function loadGoogleMaps() {
+            if (document.getElementById('google-maps-script')) return; 
+            const script = document.createElement('script');
+            script.id = 'google-maps-script';
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_API_KEY}&libraries=geometry&callback=initMap`;
+            script.async = true;
+            script.defer = true;
+            document.head.appendChild(script);
+        }
+
         function updateUserMarker(pos) {
             if (!userMarker) {
                 userMarker = new google.maps.Marker({ position: pos, map: map, label: { text: userIcon, fontSize: "24px", color: "white" }, title: currentUser });
@@ -301,7 +321,6 @@
             }
         });
 
-        // 1-2-4-6-5-8 LOGIC
         function calculateNewPoints(streakDay) {
             if (streakDay === 1) return 1; if (streakDay === 2) return 2; if (streakDay === 3) return 4;
             if (streakDay === 4) return 6; if (streakDay >= 5 && streakDay <= 21) return 5; if (streakDay >= 22) return 8; return 1; 
@@ -310,22 +329,16 @@
         document.getElementById('stopBtn').addEventListener('click', async () => {
             const btn = document.getElementById('stopBtn');
             const startBtn = document.getElementById('startBtn');
-            
-            // --- INDOOR LOGIC WITH STREAK POINTS ---
             if (gameMode === 'indoor') {
                 navigator.geolocation.clearWatch(watchId);
                 const r = indoorDistance / (2 * Math.PI);
                 const finalArea = Math.PI * r * r;
+                if (finalArea < 5) return alert("Walk more! Distance too short.");
                 
-                if (finalArea < 5) {
-                    alert("Walk more! Distance too short.");
-                    startBtn.style.display = 'block'; btn.style.display = 'none'; return;
-                }
-
                 const updates = {};
                 updates[`users/${currentUser}/bankedArea`] = (bankedArea || 0) + finalArea;
 
-                // STREAK & POINTS LOGIC (Matched with Outdoor)
+                // --- STREAK LOGIC COPIED TO INDOOR ---
                 let pointMsg = "";
                 if (finalArea >= 1000) {
                     const now = new Date(); const todayStr = now.toDateString(); const lastDate = lastConquestDate ? new Date(lastConquestDate) : null;
@@ -334,13 +347,8 @@
                          if (lastDate) { const oneDay = 24 * 60 * 60 * 1000; const diffDays = Math.round(Math.abs((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(lastDate.getFullYear(), lastDate.getMonth(), lastDate.getDate())) / oneDay)); if (diffDays === 1) newStreak = currentStreak + 1; }
                         pointsToAdd = calculateNewPoints(newStreak);
                     } else { newStreak = currentStreak; pointMsg = "\n(Daily points already claimed)"; }
-                    
-                    if (pointsToAdd > 0) {
-                        pointMsg = `\n+${pointsToAdd} Credit Points! (Streak: ${newStreak})`;
-                        updates[`users/${currentUser}/creditPoints`] = totalPoints + pointsToAdd;
-                    }
-                    updates[`users/${currentUser}/streak`] = newStreak;
-                    updates[`users/${currentUser}/lastActiveDate`] = Date.now();
+                    if (pointsToAdd > 0) { pointMsg = `\n+${pointsToAdd} Credit Points! (Streak: ${newStreak})`; updates[`users/${currentUser}/creditPoints`] = totalPoints + pointsToAdd; }
+                    updates[`users/${currentUser}/streak`] = newStreak; updates[`users/${currentUser}/lastActiveDate`] = Date.now();
                 }
 
                 try { await update(ref(db), updates); alert(`Training Complete!\nBanked: ${Math.round(finalArea)} m².${pointMsg}`); } 
@@ -348,8 +356,6 @@
                 startBtn.style.display = 'block'; btn.style.display = 'none';
                 return;
             }
-
-            // --- OUTDOOR LOGIC ---
             if (pathCoords.length < 3) { 
                 alert("Path too short."); navigator.geolocation.clearWatch(watchId); activePolyline.setMap(null); startBtn.style.display = 'block'; btn.style.display = 'none'; return;
             }
@@ -454,7 +460,9 @@
                 });
             });
         }
+
+        // --- LOAD MAPS ---
+        loadGoogleMaps();
     </script>
-    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAzfoxuzRbmyrhGChfTEWB05xvyNRmvK3k&libraries=geometry&callback=initMap"></script>
 </body>
 </html>
