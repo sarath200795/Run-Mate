@@ -1,248 +1,276 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Land Market</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Land Market Capture Logic</title>
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; padding: 0; background: #000; font-family: 'Segoe UI', sans-serif; height: 100vh; display: flex; flex-direction: column; }
-        .header { background: #111; padding: 15px; border-bottom: 2px solid #C5A059; text-align: center; color: white; display:flex; justify-content:space-between; align-items:center; }
-        .bank-display { color: #FFD700; font-weight: bold; font-size: 1.1rem; border: 1px solid #C5A059; padding: 5px 10px; border-radius: 4px; }
-        #map { flex: 1; position: relative; background: #e0e0e0; }
-        .crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; pointer-events: none; z-index: 10; opacity: 0.8; }
-        .controls { padding: 15px; background: #111; border-top: 1px solid #333; text-align: center; }
-        .btn-claim { background: #C5A059; color: black; border: none; padding: 15px 30px; font-weight: bold; font-family: 'Cinzel', serif; font-size: 1.1rem; border-radius: 4px; cursor: pointer; width: 100%; max-width: 300px; transition: background 0.3s; }
-        .btn-claim.confirm { background: #00e676; color: #003300; animation: pulse 1.5s infinite; }
-        .btn-back { background: none; border: 1px solid #555; color: #888; padding: 5px 10px; font-size: 0.8rem; cursor: pointer; border-radius: 4px; }
-        .legend { position: absolute; bottom: 140px; left: 10px; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 4px; font-size: 0.8rem; color: #ccc; pointer-events: none; z-index: 5; }
-        .legend-item { display: flex; align-items: center; margin-bottom: 5px; }
-        .color-box { width: 15px; height: 15px; margin-right: 8px; border: 1px solid #fff; }
-        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(0, 230, 118, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(0, 230, 118, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 230, 118, 0); } }
+        body { font-family: sans-serif; background: #f0f0f0; padding: 20px; }
+        .container { display: flex; gap: 20px; }
+        .canvas-wrapper { position: relative; border: 2px solid #333; background: white; cursor: crosshair; }
+        #gameCanvas { display: block; }
+        .sidebar { width: 300px; }
+        .log-box { 
+            background: #fff; border: 1px solid #ccc; height: 300px; 
+            overflow-y: auto; padding: 10px; font-size: 14px; margin-top: 10px;
+        }
+        .log-error { color: red; font-weight: bold; }
+        .log-success { color: green; }
+        .legend { margin-bottom: 20px; padding: 10px; background: white; border-radius: 5px;}
+        .dot { height: 10px; width: 10px; display: inline-block; margin-right: 5px; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <button class="btn-back" onclick="window.location.href='dashboard.html'">Back</button>
-        <div class="bank-display">Banked: <span id="bankVal">0</span> m²</div>
-        <div style="width:50px;"></div> 
-    </div>
 
-    <div id="map">
-        <div class="legend">
-            <div class="legend-item"><div class="color-box" style="background:#00e676; opacity:0.6;"></div>Your Land</div>
-            <div class="legend-item"><div class="color-box" style="background:#888; opacity:0.6;"></div>Occupied</div>
-            <div class="legend-item"><div class="color-box" style="background:#FFD700; opacity:0.6; border:1px dashed white;"></div>Preview</div>
+    <h2>Land Market Capture System</h2>
+    <p>Draw a box (Click & Drag) to attempt a capture.</p>
+
+    <div class="container">
+        <div class="canvas-wrapper">
+            <canvas id="gameCanvas" width="800" height="600"></canvas>
         </div>
-        <svg class="crosshair" viewBox="0 0 100 100">
-            <line x1="50" y1="0" x2="50" y2="100" stroke="#000" stroke-width="2" />
-            <line x1="0" y1="50" x2="100" y2="50" stroke="#000" stroke-width="2" />
-            <circle cx="50" cy="50" r="40" stroke="#000" stroke-width="2" fill="none" />
-        </svg>
+
+        <div class="sidebar">
+            <div class="legend">
+                <div><span class="dot" style="background:blue"></span> <strong>YOU</strong> (Self)</div>
+                <div><span class="dot" style="background:green"></span> <strong>ALLY</strong> (Clan Mate)</div>
+                <div><span class="dot" style="background:red"></span> <strong>ENEMY</strong> (Target)</div>
+            </div>
+            <button onclick="resetMap()">Reset Map</button>
+            <div id="statusLog" class="log-box"></div>
+        </div>
     </div>
 
-    <div class="controls">
-        <div style="color:#888; font-size:0.9rem; margin-bottom:10px;">Drag map to target. Preview to check fit.</div>
-        <button class="btn-claim" id="btnClaim">PREVIEW AREA</button>
-    </div>
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const logBox = document.getElementById('statusLog');
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-        import { getDatabase, ref, push, update, onValue, get } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+    // --- GAME STATE ---
+    const MY_ID = 'user_1';
+    const MY_CLAN = 'clan_A';
+    
+    // Initial Land Data
+    let lands = [];
 
-        const GOOGLE_API_KEY = "AIzaSyAzfoxuzRbmyrhGChfTEWB05xvyNRmvK3k"; 
-        const firebaseConfig = { databaseURL: "https://runmate-cb328-default-rtdb.firebaseio.com/" };
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
-        const currentUser = localStorage.getItem('currentUser');
-
-        if (!currentUser) window.location.href = 'index.html';
-
-        let map, bankAmount = 0;
-        let allPolygons = []; 
-        let previewPolygon = null; // Stores the visual preview
-        let previewCoords = null;  // Stores the coordinates for submission
-        let isPreviewMode = false; // Tracks state
-
-        window.initMap = function() {
-            const mapEl = document.getElementById("map");
-            try {
-                map = new google.maps.Map(mapEl, {
-                    zoom: 18, center: { lat: 0, lng: 0 }, mapTypeId: 'roadmap', disableDefaultUI: true,
-                    styles: [{ featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] }]
-                });
-
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(pos => {
-                        map.setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-                    });
-                } else { map.setCenter({ lat: 40.7128, lng: -74.0060 }); }
-
-                // RESET PREVIEW ON MAP MOVE
-                map.addListener('center_changed', () => {
-                    if (isPreviewMode) resetPreview();
-                });
-
-                loadUserData(); 
-                loadExistingLands();
-            } catch (err) { console.error("Map Error:", err); }
-        };
-
-        function loadGoogleMaps() {
-            if (document.getElementById('google-maps-script')) return; 
-            const script = document.createElement('script');
-            script.id = 'google-maps-script';
-            script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_API_KEY}&libraries=geometry&callback=initMap`;
-            script.async = true; script.defer = true;
-            document.head.appendChild(script);
-        }
-
-        function loadUserData() {
-            onValue(ref(db, `users/${currentUser}`), (snap) => {
-                const val = snap.val();
-                bankAmount = val ? (val.bankedArea || 0) : 0;
-                document.getElementById('bankVal').innerText = Math.round(bankAmount);
-                checkButtonState();
-            });
-        }
-
-        function checkButtonState() {
-            const btn = document.getElementById('btnClaim');
-            if (bankAmount < 5) {
-                btn.disabled = true; 
-                btn.style.background = "#333"; 
-                btn.innerText = "Insufficient Banked Area";
-                btn.classList.remove('confirm');
-            } else if (!isPreviewMode) {
-                btn.disabled = false; 
-                btn.style.background = "#C5A059"; 
-                btn.innerText = "PREVIEW AREA";
-                btn.classList.remove('confirm');
-            }
-        }
-
-        function resetPreview() {
-            if (previewPolygon) {
-                previewPolygon.setMap(null);
-                previewPolygon = null;
-            }
-            previewCoords = null;
-            isPreviewMode = false;
+    function initLands() {
+        lands = [
+            // 1. My Land (Blue)
+            createLand('user_1', 'clan_A', 'blue', [[50, 50], [200, 50], [200, 150], [50, 150], [50, 50]]),
             
-            const btn = document.getElementById('btnClaim');
-            btn.innerText = "PREVIEW AREA";
-            btn.style.background = "#C5A059";
-            btn.classList.remove('confirm');
-        }
+            // 2. Ally Land (Green)
+            createLand('user_2', 'clan_A', 'green', [[250, 50], [400, 50], [400, 150], [250, 150], [250, 50]]),
+            
+            // 3. Enemy Land 1 (Red) - Big square
+            createLand('enemy_1', 'clan_B', 'red', [[100, 300], [300, 300], [300, 500], [100, 500], [100, 300]]),
 
-        function loadExistingLands() {
-            onValue(ref(db, 'territories'), (snapshot) => {
-                const data = snapshot.val();
-                if(allPolygons.length > 0) { allPolygons.forEach(p => p.poly.setMap(null)); allPolygons = []; }
-                if (data) Object.values(data).forEach(t => {
-                    const isMine = t.owner === currentUser;
-                    const fillC = isMine ? '#00e676' : '#555555';
-                    const strokeC = isMine ? '#004d26' : '#222222';
-                    const zIdx = isMine ? 10 : 1;
-                    const poly = new google.maps.Polygon({
-                        paths: t.coords, fillColor: fillC, fillOpacity: 0.5, strokeColor: strokeC, strokeWeight: 2, zIndex: zIdx, map: map, clickable: false 
-                    });
-                    const tCoords = t.coords.map(c => [c.lng, c.lat]);
-                    tCoords.push([t.coords[0].lng, t.coords[0].lat]);
-                    allPolygons.push({ turfPoly: turf.polygon([tCoords]), poly: poly });
-                });
-            });
-        }
+            // 4. Enemy Land 2 (Red) - Rectangle nearby
+            createLand('enemy_2', 'clan_B', 'red', [[350, 300], [550, 300], [550, 400], [350, 400], [350, 300]])
+        ];
+        draw();
+        log("Map Initialized. Ready.");
+    }
 
-        document.getElementById('btnClaim').addEventListener('click', async () => {
-            if(bankAmount < 5) return;
+    // Helper to create land object with Turf.js Polygon
+    function createLand(owner, clan, color, coords) {
+        return {
+            id: Math.random().toString(36).substr(2, 9),
+            owner: owner,
+            clan: clan,
+            color: color,
+            // Create a Turf.js polygon feature
+            geo: turf.polygon([coords]) 
+        };
+    }
 
-            const btn = document.getElementById('btnClaim');
+    // --- INTERACTION LOGIC ---
+    let isDrawing = false;
+    let startX, startY;
+    let currentSelection = null; // Stores the drag box coordinates
 
-            // --- STEP 1: PREVIEW ---
-            if (!isPreviewMode) {
-                const center = map.getCenter();
-                const lat = center.lat();
-                const lng = center.lng();
-                const radiusMeters = Math.sqrt(bankAmount / Math.PI);
+    canvas.addEventListener('mousedown', e => {
+        const rect = canvas.getBoundingClientRect();
+        startX = e.clientX - rect.left;
+        startY = e.clientY - rect.top;
+        isDrawing = true;
+    });
+
+    canvas.addEventListener('mousemove', e => {
+        if (!isDrawing) return;
+        const rect = canvas.getBoundingClientRect();
+        const currentX = e.clientX - rect.left;
+        const currentY = e.clientY - rect.top;
+        
+        // Visualize the selection box
+        draw();
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.strokeRect(startX, startY, currentX - startX, currentY - startY);
+        ctx.setLineDash([]);
+    });
+
+    canvas.addEventListener('mouseup', e => {
+        if (!isDrawing) return;
+        isDrawing = false;
+        const rect = canvas.getBoundingClientRect();
+        const endX = e.clientX - rect.left;
+        const endY = e.clientY - rect.top;
+
+        // Create the selection polygon (Clockwise coordinates, closed loop)
+        // Must handle dragging in any direction (negative width/height)
+        const x1 = Math.min(startX, endX);
+        const y1 = Math.min(startY, endY);
+        const x2 = Math.max(startX, endX);
+        const y2 = Math.max(startY, endY);
+
+        // Ignore tiny clicks
+        if (x2 - x1 < 5 || y2 - y1 < 5) return;
+
+        const selectionCoords = [
+            [x1, y1], [x2, y1], [x2, y2], [x1, y2], [x1, y1] // Closing the loop
+        ];
+        
+        const selectionPoly = turf.polygon([selectionCoords]);
+        
+        // EXECUTE CORE LOGIC
+        processCaptureAttempt(selectionPoly);
+    });
+
+    // --- CORE BUSINESS LOGIC ---
+    
+    function processCaptureAttempt(selectionPoly) {
+        let potentialCaptures = [];
+        let friendlyFire = false;
+
+        // STEP 1: Validation Scan
+        // We check ALL lands touching the selection first
+        for (let land of lands) {
+            // Check intersection using Turf
+            if (turf.booleanIntersects(selectionPoly, land.geo)) {
                 
-                // Generate Coords
-                previewCoords = generateCircleCoords(lat, lng, radiusMeters);
-                
-                // Turf Check
-                const turfCoords = previewCoords.map(c => [c.lng, c.lat]);
-                turfCoords.push([previewCoords[0].lng, previewCoords[0].lat]); 
-                const newPoly = turf.polygon([turfCoords]);
-
-                for(const existing of allPolygons) {
-                    if (turf.intersect(newPoly, existing.turfPoly)) { 
-                        alert("⚠️ Area blocked! The preview overlaps with existing territory. Move the map."); 
-                        return; 
-                    }
+                // RULE: Cannot capture self or ally
+                if (land.owner === MY_ID) {
+                    log("WARNING: You cannot capture your own land!", "error");
+                    friendlyFire = true;
+                    break;
+                }
+                if (land.clan === MY_CLAN) {
+                    log("WARNING: You cannot capture Clan Ally's land!", "error");
+                    friendlyFire = true;
+                    break;
                 }
 
-                // Draw Preview
-                previewPolygon = new google.maps.Polygon({
-                    paths: previewCoords,
-                    fillColor: "#FFD700",
-                    fillOpacity: 0.4,
-                    strokeColor: "#FFD700",
-                    strokeWeight: 2,
-                    strokeOpacity: 0.8,
-                    map: map,
-                    clickable: false
-                });
+                // If Enemy, add to process list
+                potentialCaptures.push(land);
+            }
+        }
 
-                // Change State
-                isPreviewMode = true;
-                btn.innerText = "CONFIRM CLAIM";
-                btn.classList.add('confirm');
-                return;
+        if (friendlyFire) {
+            draw(); // Clear the selection box visual
+            return; // STOP execution
+        }
+
+        if (potentialCaptures.length === 0) {
+            log("No valid land selected.");
+            draw();
+            return;
+        }
+
+        // STEP 2: Execution (Boolean Operations)
+        let modifiedLands = []; // Lands that were cut
+        let newCapturedLands = []; // New lands gained by user
+
+        // Remove the original enemy lands from the main array first
+        // We will add back their "remainders" later
+        lands = lands.filter(l => !potentialCaptures.includes(l));
+
+        potentialCaptures.forEach(enemyLand => {
+            
+            // 1. Calculate the Intersection (The part we steal)
+            const stolenGeo = turf.intersect(enemyLand.geo, selectionPoly);
+            
+            if (stolenGeo) {
+                // Add new land for USER
+                newCapturedLands.push({
+                    id: Math.random().toString(36).substr(2, 9),
+                    owner: MY_ID,
+                    clan: MY_CLAN,
+                    color: 'blue', // It is now ours
+                    geo: stolenGeo
+                });
             }
 
-            // --- STEP 2: CAPTURE ---
-            if (isPreviewMode && previewCoords) {
-                // Double check (redundant but safe)
-                if(!confirm(`Finalize capture of ${Math.round(bankAmount)} m²?`)) return;
+            // 2. Calculate the Difference (The part the enemy keeps)
+            const remainingGeo = turf.difference(enemyLand.geo, selectionPoly);
 
-                const updates = {};
-                const newKey = push(ref(db, 'territories')).key;
-                updates[`territories/${newKey}`] = { 
-                    owner: currentUser, 
-                    coords: previewCoords, 
-                    areaSize: bankAmount, 
-                    timestamp: Date.now(), 
-                    source: 'Market' 
-                };
-                updates[`users/${currentUser}/bankedArea`] = 0; 
-                
-                // Bonus Points
-                const userSnap = await get(ref(db, `users/${currentUser}`));
-                const currentPoints = userSnap.val().creditPoints || 0;
-                updates[`users/${currentUser}/creditPoints`] = currentPoints + 10;
-
-                try { 
-                    await update(ref(db), updates); 
-                    resetPreview(); // Clear preview
-                    alert("Territory Claimed Successfully!"); 
-                    window.location.href = 'dashboard.html'; 
-                } catch(e) { 
-                    alert("Error: " + e.message); 
-                }
+            if (remainingGeo) {
+                // Turf might return a MultiPolygon if we split the land in two
+                // We simplify by treating it as the modified enemy land
+                enemyLand.geo = remainingGeo;
+                modifiedLands.push(enemyLand);
+            } else {
+                log(`Enemy land ${enemyLand.id} was fully captured!`);
             }
         });
 
-        function generateCircleCoords(lat, lng, radius) {
-            const points = 32; const coords = [];
-            for (let i = 0; i < points; i++) {
-                const theta = (i / points) * (2 * Math.PI);
-                const offset = google.maps.geometry.spherical.computeOffset(new google.maps.LatLng(lat, lng), radius, (theta * 180) / Math.PI);
-                coords.push({ lat: offset.lat(), lng: offset.lng() });
-            }
-            return coords;
-        }
+        // Update Main State
+        lands = [...lands, ...modifiedLands, ...newCapturedLands];
+        
+        log(`Success! Captured ${newCapturedLands.length} territories.`, "success");
+        draw();
+    }
 
-        loadGoogleMaps();
-    </script>
+    // --- RENDERING ---
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        lands.forEach(land => {
+            ctx.fillStyle = land.color;
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+
+            // Handle both Polygon and MultiPolygon (if land gets split into islands)
+            const geometryType = land.geo.geometry.type;
+            const coordsList = geometryType === 'MultiPolygon' 
+                ? land.geo.geometry.coordinates 
+                : [land.geo.geometry.coordinates];
+
+            coordsList.forEach(polygon => {
+                // Polygon[0] is the outer ring
+                const outerRing = polygon[0]; 
+                
+                ctx.beginPath();
+                ctx.moveTo(outerRing[0][0], outerRing[0][1]);
+                for (let i = 1; i < outerRing.length; i++) {
+                    ctx.lineTo(outerRing[i][0], outerRing[i][1]);
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+            });
+        });
+    }
+
+    // --- UTILS ---
+    function log(msg, type = "normal") {
+        const div = document.createElement('div');
+        div.textContent = `> ${msg}`;
+        if (type === 'error') div.className = 'log-error';
+        if (type === 'success') div.className = 'log-success';
+        logBox.insertBefore(div, logBox.firstChild);
+    }
+
+    function resetMap() {
+        initLands();
+        logBox.innerHTML = '';
+        log("Map Reset.");
+    }
+
+    // Start
+    initLands();
+
+</script>
 </body>
 </html>
