@@ -7,28 +7,13 @@
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
     <style>
         html, body { height: 100%; margin: 0; padding: 0; background: #000; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
-        
         #map { height: 100%; width: 100%; }
-        
-        /* INDOOR INTERFACE STYLES */
-        #indoorInterface {
-            display: none; height: 100%; width: 100%;
-            background: radial-gradient(circle at center, #111 0%, #000 100%);
-            flex-direction: column; align-items: center; justify-content: center;
-            color: white; position: absolute; top: 0; left: 0; z-index: 50;
-        }
-        .metric-circle {
-            width: 200px; height: 200px; border-radius: 50%; border: 5px solid #00e676;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            margin-bottom: 30px; box-shadow: 0 0 30px rgba(0, 230, 118, 0.2);
-            animation: pulse 2s infinite;
-        }
+        #indoorInterface { display: none; height: 100%; width: 100%; background: radial-gradient(circle at center, #111 0%, #000 100%); flex-direction: column; align-items: center; justify-content: center; color: white; position: absolute; top: 0; left: 0; z-index: 50; }
+        .metric-circle { width: 200px; height: 200px; border-radius: 50%; border: 5px solid #00e676; display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 30px; box-shadow: 0 0 30px rgba(0, 230, 118, 0.2); animation: pulse 2s infinite; }
         @keyframes pulse { 0% { box-shadow: 0 0 10px rgba(0,230,118,0.1); } 50% { box-shadow: 0 0 30px rgba(0,230,118,0.4); } 100% { box-shadow: 0 0 10px rgba(0,230,118,0.1); } }
-        
         .metric-val { font-size: 2.5rem; font-weight: bold; color: white; font-family: 'Cinzel', serif; }
         .metric-label { color: #888; font-size: 0.9rem; margin-top: 5px; text-transform: uppercase; }
         .bank-box { background: #222; padding: 15px 30px; border-radius: 8px; border: 1px solid #FFD700; text-align: center; }
-
         .sidebar { position: absolute; top: 0; left: 0; bottom: 0; width: 250px; background: rgba(20,20,20,0.95); border-right: 2px solid #8B0000; z-index: 400; transform: translateX(-100%); transition: 0.3s; color: white; padding-top: 10px; display:flex; flex-direction:column;}
         .sidebar.open { transform: translateX(0); }
         .menu-toggle { position: absolute; top: 10px; left: 10px; z-index: 401; background: #8B0000; color: white; padding: 8px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; border: 2px solid #ff4444; font-family: 'Cinzel', serif; }
@@ -39,24 +24,18 @@
         .sb-sub { color:#aaa; font-size:0.8rem; margin-bottom: 15px; }
         .points-box { background: #111; border: 1px solid #C5A059; padding: 10px; margin: 10px; border-radius: 6px; }
         .points-val { color: #C5A059; font-size: 1.2rem; font-weight: bold; }
-        
         .controls { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 400px; z-index: 300; display: flex; flex-direction: column; gap: 10px; }
         button { padding: 15px; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: bold; cursor: pointer; font-family: 'Cinzel', serif; text-transform: uppercase; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         #startBtn { background: linear-gradient(180deg, #00e676, #00c853); color: #003300; }
-        
-        /* Updated Stop Button for Dynamic Feedback */
         #stopBtn { background: linear-gradient(180deg, #ff1744, #d50000); color: white; display: none; transition: 0.3s; }
         #stopBtn.ready { background: linear-gradient(180deg, #FFD700, #B8860B); color: black; animation: pulse 2s infinite; border: 2px solid #fff; }
-
         .toast { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); padding: 15px 25px; border-radius: 50px; color: white; font-weight: bold; border: 2px solid #ff4444; display: none; z-index: 500; text-align: center; white-space: nowrap; box-shadow: 0 0 20px rgba(255, 0, 0, 0.4); }
         .sb-clan { flex: 1; padding: 10px; overflow-y: auto; border-top: 1px solid #444; }
         .lb-item { display: flex; justify-content: space-between; padding: 5px; border-bottom: 1px solid #333; font-size: 0.85rem; }
         .logout-btn-sb { padding: 10px; border: 1px solid #ff4444; color: #ff4444; background: none; margin: 10px; cursor: pointer; }
-        
         .mode-switch-container { position: absolute; top: 10px; right: 10px; z-index: 401; background: rgba(0,0,0,0.8); padding: 5px; border-radius: 20px; border: 1px solid #C5A059; display: flex; gap: 5px; }
         .mode-btn { padding: 8px 15px; border-radius: 15px; border: none; cursor: pointer; font-weight: bold; color: #aaa; background: none; font-size: 0.8rem; }
         .mode-btn.active { background: #C5A059; color: black; }
-
         .modal { display: none; position: fixed; z-index: 999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); align-items: center; justify-content: center; }
         .modal-content { background: #1a1a1a; padding: 25px; border: 2px solid #C5A059; border-radius: 8px; width: 90%; max-width: 400px; color: white; text-align: center; position: relative; }
         .modal h2 { color: #C5A059; margin-top: 0; font-family: 'Cinzel', serif; }
@@ -70,21 +49,17 @@
 </head>
 <body>
     <div class="menu-toggle" id="menuBtn">☰ STATS</div>
-    
     <div class="mode-switch-container">
         <button class="mode-btn active" id="btnModeOut" onclick="window.setMode('outdoor')">🏹 OUTDOOR</button>
         <button class="mode-btn" id="btnModeIn" onclick="window.setMode('indoor')">🏃 INDOOR</button>
     </div>
-
     <div id="indoorInterface">
         <h2 style="color:#C5A059; font-family:'Cinzel', serif; letter-spacing:2px; margin-bottom:30px;">TRAINING MODE</h2>
         <div class="metric-circle"><div class="metric-val" id="indDistLarge">0</div><div class="metric-label">METERS</div></div>
         <div class="bank-box"><div class="metric-label">BANKABLE AREA</div><div class="metric-val" style="font-size:1.8rem; color:#FFD700;" id="indAreaLarge">0 m²</div></div>
         <div style="color:#666; font-size:0.8rem; margin-top:30px; max-width:250px; text-align:center;">Keep walking to accumulate area. Stop to bank it for the Market.</div>
     </div>
-
     <div id="toast" class="toast">⚠️ WARNING</div>
-
     <div class="sidebar" id="sidebar">
         <div class="sb-header"><div id="sbUser">...</div><div id="sbRank" class="rank-badge">Peasant</div></div>
         <div class="sb-stats">
@@ -98,16 +73,13 @@
         <div class="sb-clan" id="clanSection" style="display:none;"><div style="color:#C5A059; text-align:center; font-family:'Cinzel', serif;">CLAN RANKING</div><div id="clanLeaderboard"></div></div>
         <button class="logout-btn-sb" onclick="window.logout()">LOGOUT</button>
     </div>
-
     <div id="map"></div>
-    
     <div class="controls">
         <div id="modeHelper" style="background:rgba(0,0,0,0.7); padding:10px; border-radius:8px; margin-bottom:10px; text-align:center; color:#ccc; font-size:0.9rem;">💡 Tap Green/Gold territories to deploy guards</div>
         <button id="startBtn">⚔️ Start Conquest</button>
         <button id="stopBtn">🚩 Claim Territory</button>
         <a href="dashboard.html" style="background:white; text-align:center; padding:10px; border-radius:8px; font-weight:bold; color:black; text-decoration:none; font-family:'Cinzel', serif;">Exit to Command</a>
     </div>
-
     <div id="guardModal" class="modal">
         <div class="modal-content">
             <h2 id="mTitle">🛡️ Secure Territory</h2>
@@ -123,98 +95,43 @@
             <button class="btn-cancel" onclick="document.getElementById('guardModal').style.display='none'">Cancel</button>
         </div>
     </div>
-
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
         import { getDatabase, ref, push, update, onValue, get, child, runTransaction } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
-
-        // --- REPLACE THIS WITH YOUR API KEY ---
-        const GOOGLE_API_KEY = "AIzaSyAzfoxuzRbmyrhGChfTEWB05xvyNRmvK3k"; 
-
         const firebaseConfig = { databaseURL: "https://runmate-cb328-default-rtdb.firebaseio.com/" };
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
         
         let map, userMarker, activePolyline, watchId, pathCoords = [];
-        let allPolygons = []; 
-        let visualPolygons = []; 
-        let lastKnownPos = null;
-        let gameMode = 'outdoor'; 
-        let indoorDistance = 0;
-        let lastIndoorPos = null;
-        
+        let allPolygons = []; let visualPolygons = []; let lastKnownPos = null;
+        let gameMode = 'outdoor'; let indoorDistance = 0; let lastIndoorPos = null;
         const currentUser = localStorage.getItem('currentUser');
         const userIcon = localStorage.getItem('userIcon') || "👤";
-        let myClan = null;
-        let myClanMembers = {};
-        let currentStreak = 0;
-        let totalPoints = 0;
-        let bankedArea = 0;
-        let lastConquestDate = 0;
-        let selectedLandId = null;
+        let myClan = null; let myClanMembers = {};
+        let currentStreak = 0; let totalPoints = 0; let bankedArea = 0;
+        let lastConquestDate = 0; let selectedLandId = null;
 
         if(!currentUser) window.location.href = 'index.html';
         document.getElementById('sbUser').innerText = `${userIcon} ${currentUser}`;
         document.getElementById('menuBtn').addEventListener('click', () => document.getElementById('sidebar').classList.toggle('open'));
-
         window.logout = function() { if(confirm("Logout?")) { localStorage.clear(); window.location.href = 'index.html'; }};
         
-        // --- 1. GLOBAL INITMAP DEFINITION (Called by Google) ---
-        window.initMap = function() {
-            const mapEl = document.getElementById("map");
-            if(!mapEl) return;
-
-            map = new google.maps.Map(mapEl, {
-                zoom: 19, center: { lat: 0, lng: 0 }, mapTypeId: 'terrain', disableDefaultUI: true,
-                styles: [{ elementType: "geometry", stylers: [{ color: "#242f3e" }] }, { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] }, { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] }, { featureType: "road", elementType: "geometry", stylers: [{ color: "#38414e" }] }]
-            });
-            loadUserData();
-            if (navigator.geolocation) {
-                navigator.geolocation.watchPosition(pos => {
-                    const latLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                    lastKnownPos = latLng;
-                    updateUserMarker(latLng);
-                    if(gameMode === 'outdoor') checkGuardProximity(latLng);
-                }, err => console.error(err), { enableHighAccuracy: true });
-            }
-        };
-
-        // --- 2. DYNAMIC SCRIPT LOADER (Fixes Race Condition) ---
-        function loadGoogleMaps() {
-            if (document.getElementById('google-maps-script')) return; 
-            const script = document.createElement('script');
-            script.id = 'google-maps-script';
-            script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_API_KEY}&libraries=geometry&callback=initMap`;
-            script.async = true;
-            script.defer = true;
-            document.head.appendChild(script);
-        }
-
         window.setMode = (mode) => {
             if(document.getElementById('stopBtn').style.display === 'block') return alert("Stop current session first!");
             gameMode = mode;
             document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-            
             const mapDiv = document.getElementById('map');
             const indDiv = document.getElementById('indoorInterface');
-
             if(mode === 'outdoor') {
                 document.getElementById('btnModeOut').classList.add('active');
-                mapDiv.style.display = 'block';
-                indDiv.style.display = 'none';
+                mapDiv.style.display = 'block'; indDiv.style.display = 'none';
                 document.getElementById('modeHelper').innerText = "💡 Tap Green/Gold territories to deploy guards";
                 document.getElementById('startBtn').innerText = "⚔️ Start Conquest";
                 document.getElementById('stopBtn').innerText = "🚩 Claim Territory";
-                
-                // FORCE MAP RESIZE & RECENTER
-                if(map) {
-                    google.maps.event.trigger(map, "resize");
-                    if(lastKnownPos) map.setCenter(lastKnownPos);
-                }
+                if(map) google.maps.event.trigger(map, "resize");
             } else {
                 document.getElementById('btnModeIn').classList.add('active');
-                mapDiv.style.display = 'none';
-                indDiv.style.display = 'flex';
+                mapDiv.style.display = 'none'; indDiv.style.display = 'flex';
                 document.getElementById('modeHelper').innerText = "🏃 Walk to bank area. Redeem later in Market.";
                 document.getElementById('startBtn').innerText = "🏃 Start Training";
                 document.getElementById('stopBtn').innerText = "💾 Bank Area";
@@ -229,7 +146,6 @@
             t.style.color = isBad ? '#ff8a80' : '#b9f6ca';
             setTimeout(() => { t.style.display = 'none'; }, 3000);
         }
-
         function calculateRank(area) {
             if (area >= 100000) return "👑 KING";
             if (area >= 10000) return "⚔️ WARRIOR";
@@ -237,14 +153,26 @@
             if (area >= 100) return "🌾 FARMER";
             return "🪵 PEASANT";
         }
-
+        window.initMap = function() {
+            map = new google.maps.Map(document.getElementById("map"), {
+                zoom: 19, center: { lat: 0, lng: 0 }, mapTypeId: 'terrain', disableDefaultUI: true,
+                styles: [{ elementType: "geometry", stylers: [{ color: "#242f3e" }] }, { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] }, { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] }, { featureType: "road", elementType: "geometry", stylers: [{ color: "#38414e" }] }]
+            });
+            loadUserData();
+            if (navigator.geolocation) {
+                navigator.geolocation.watchPosition(pos => {
+                    const latLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                    lastKnownPos = latLng; updateUserMarker(latLng);
+                    if(gameMode === 'outdoor') checkGuardProximity(latLng);
+                }, err => console.error(err), { enableHighAccuracy: true });
+            }
+        };
         function updateUserMarker(pos) {
             if (!userMarker) {
                 userMarker = new google.maps.Marker({ position: pos, map: map, label: { text: userIcon, fontSize: "24px", color: "white" }, title: currentUser });
                 map.setCenter(pos);
             } else { userMarker.setPosition(pos); }
         }
-
         function checkGuardProximity(pos) {
             if(!allPolygons.length || !pos) return;
             const pt = turf.point([pos.lng, pos.lat]);
@@ -258,30 +186,20 @@
                 }
             }
         }
-
         function loadUserData() {
             onValue(ref(db, `users/${currentUser}`), (snap) => {
                 const u = snap.val();
                 if(!u) return;
-                myClan = u.clan || null;
-                currentStreak = u.streak || 0;
-                totalPoints = u.creditPoints || 0;
-                bankedArea = u.bankedArea || 0;
-                lastConquestDate = u.lastActiveDate || 0;
+                myClan = u.clan || null; currentStreak = u.streak || 0; totalPoints = u.creditPoints || 0;
+                bankedArea = u.bankedArea || 0; lastConquestDate = u.lastActiveDate || 0;
                 document.getElementById('sbPoints').innerText = totalPoints;
                 document.getElementById('sbStreak').innerText = currentStreak;
-                
                 if(myClan) { 
                     document.getElementById('clanSection').style.display = 'block'; 
-                    get(child(ref(db), `clans/${myClan}/members`)).then(mSnap => { 
-                        myClanMembers = mSnap.val() || {}; loadTerritories(); 
-                    });
-                } else {
-                    myClanMembers = {}; loadTerritories();
-                }
+                    get(child(ref(db), `clans/${myClan}/members`)).then(mSnap => { myClanMembers = mSnap.val() || {}; loadTerritories(); });
+                } else { myClanMembers = {}; loadTerritories(); }
             });
         }
-
         function loadStatsAndRank(data) {
             let myArea = 0, clanStats = {};
             Object.values(data).forEach(t => {
@@ -292,7 +210,6 @@
             document.getElementById('sbRank').innerText = calculateRank(myArea);
             if (myClan) updateClanLeaderboard(clanStats);
         }
-
         async function updateClanLeaderboard(rawStats) {
             const clanSnap = await get(child(ref(db), `clans/${myClan}/members`));
             const members = clanSnap.val() || {};
@@ -301,23 +218,17 @@
             lb.sort((a, b) => b.score - a.score);
             document.getElementById('clanLeaderboard').innerHTML = lb.slice(0, 10).map((p, i) => `<div class="lb-item"><span>#${i+1} ${p.name}</span><span style="color:#aaa;">${Math.round(p.score)}</span></div>`).join('');
         }
-
         const rangeInput = document.getElementById('mRange');
         rangeInput.addEventListener('input', (e) => updateModalCalc(e.target.value));
-
         function updateModalCalc(val) {
             document.getElementById('mCountVal').innerText = val;
             const cost = val * 10;
             const costEl = document.getElementById('mCost');
             costEl.innerText = cost + " Pts";
             const btn = document.getElementById('btnConfirm');
-            if (totalPoints < cost) {
-                costEl.style.color = "red"; btn.disabled = true; btn.innerText = "NOT ENOUGH POINTS"; btn.style.background = "#444";
-            } else {
-                costEl.style.color = "#ff4444"; btn.disabled = false; btn.innerText = "DEPLOY GUARDS"; btn.style.background = "#00e676";
-            }
+            if (totalPoints < cost) { costEl.style.color = "red"; btn.disabled = true; btn.innerText = "NOT ENOUGH POINTS"; btn.style.background = "#444"; } 
+            else { costEl.style.color = "#ff4444"; btn.disabled = false; btn.innerText = "DEPLOY GUARDS"; btn.style.background = "#00e676"; }
         }
-
         window.openDeploymentModal = (landId, area, isAlly = false) => {
             selectedLandId = landId;
             const coverage = isAlly ? 250 : 500; 
@@ -330,7 +241,6 @@
             updateModalCalc(requiredGuards);
             document.getElementById('guardModal').style.display = 'flex';
         };
-
         document.getElementById('btnConfirm').addEventListener('click', async () => {
             if (!selectedLandId) return;
             const count = parseInt(rangeInput.value);
@@ -344,6 +254,7 @@
             try { await update(ref(db), updates); alert("Guards Deployed!"); document.getElementById('guardModal').style.display = 'none'; } catch(e) { alert(e.message); }
         });
 
+        // --- BUTTON HANDLERS ---
         document.getElementById('startBtn').addEventListener('click', () => {
             if (!map && gameMode === 'outdoor') return alert("Map loading...");
             pathCoords = []; 
@@ -360,22 +271,12 @@
                     const latLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
                     pathCoords.push(latLng); 
                     activePolyline.getPath().push(new google.maps.LatLng(latLng.lat, latLng.lng));
-                    map.panTo(latLng); 
-                    updateUserMarker(latLng);
-
+                    map.panTo(latLng); updateUserMarker(latLng);
                     if (pathCoords.length > 2) {
                         const rawArea = google.maps.geometry.spherical.computeArea(activePolyline.getPath());
                         stopBtn.innerText = `🚩 Claim Territory (${Math.round(rawArea)} m²)`;
-                        
-                        // "Enough" Threshold: 1000m2
-                        if (rawArea >= 1000) {
-                            stopBtn.classList.add('ready'); 
-                            stopBtn.innerText = `🏆 CLAIM VICTORY (${Math.round(rawArea)} m²)`;
-                        } else {
-                            stopBtn.classList.remove('ready');
-                        }
+                        if (rawArea >= 1000) { stopBtn.classList.add('ready'); stopBtn.innerText = `🏆 CLAIM VICTORY (${Math.round(rawArea)} m²)`; } else { stopBtn.classList.remove('ready'); }
                     }
-
                     checkGuardProximity(latLng);
                 }, err => console.error(err), { enableHighAccuracy: true });
             } else {
@@ -400,81 +301,86 @@
             }
         });
 
+        // 1-2-4-6-5-8 LOGIC
         function calculateNewPoints(streakDay) {
-            if (streakDay === 1) return 1;
-            if (streakDay === 2) return 2;
-            if (streakDay === 3) return 4;
-            if (streakDay === 4) return 6;
-            if (streakDay >= 5 && streakDay <= 21) return 5;
-            if (streakDay >= 22) return 8;
-            return 1; 
+            if (streakDay === 1) return 1; if (streakDay === 2) return 2; if (streakDay === 3) return 4;
+            if (streakDay === 4) return 6; if (streakDay >= 5 && streakDay <= 21) return 5; if (streakDay >= 22) return 8; return 1; 
         }
 
         document.getElementById('stopBtn').addEventListener('click', async () => {
             const btn = document.getElementById('stopBtn');
             const startBtn = document.getElementById('startBtn');
-
+            
+            // --- INDOOR LOGIC WITH STREAK POINTS ---
             if (gameMode === 'indoor') {
                 navigator.geolocation.clearWatch(watchId);
                 const r = indoorDistance / (2 * Math.PI);
                 const finalArea = Math.PI * r * r;
-                if (finalArea < 5) return alert("Walk more! Distance too short.");
                 
+                if (finalArea < 5) {
+                    alert("Walk more! Distance too short.");
+                    startBtn.style.display = 'block'; btn.style.display = 'none'; return;
+                }
+
                 const updates = {};
                 updates[`users/${currentUser}/bankedArea`] = (bankedArea || 0) + finalArea;
-                try { await update(ref(db), updates); alert(`Training Complete!\nBanked: ${Math.round(finalArea)} m².`); } 
+
+                // STREAK & POINTS LOGIC (Matched with Outdoor)
+                let pointMsg = "";
+                if (finalArea >= 1000) {
+                    const now = new Date(); const todayStr = now.toDateString(); const lastDate = lastConquestDate ? new Date(lastConquestDate) : null;
+                    let newStreak = 1; let pointsToAdd = 0;
+                    if (!lastDate || lastDate.toDateString() !== todayStr) {
+                         if (lastDate) { const oneDay = 24 * 60 * 60 * 1000; const diffDays = Math.round(Math.abs((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(lastDate.getFullYear(), lastDate.getMonth(), lastDate.getDate())) / oneDay)); if (diffDays === 1) newStreak = currentStreak + 1; }
+                        pointsToAdd = calculateNewPoints(newStreak);
+                    } else { newStreak = currentStreak; pointMsg = "\n(Daily points already claimed)"; }
+                    
+                    if (pointsToAdd > 0) {
+                        pointMsg = `\n+${pointsToAdd} Credit Points! (Streak: ${newStreak})`;
+                        updates[`users/${currentUser}/creditPoints`] = totalPoints + pointsToAdd;
+                    }
+                    updates[`users/${currentUser}/streak`] = newStreak;
+                    updates[`users/${currentUser}/lastActiveDate`] = Date.now();
+                }
+
+                try { await update(ref(db), updates); alert(`Training Complete!\nBanked: ${Math.round(finalArea)} m².${pointMsg}`); } 
                 catch(e) { alert("Error saving: " + e.message); }
                 startBtn.style.display = 'block'; btn.style.display = 'none';
                 return;
             }
 
+            // --- OUTDOOR LOGIC ---
             if (pathCoords.length < 3) { 
-                alert("Path too short."); 
-                navigator.geolocation.clearWatch(watchId);
-                activePolyline.setMap(null);
-                startBtn.style.display = 'block'; btn.style.display = 'none';
-                return;
+                alert("Path too short."); navigator.geolocation.clearWatch(watchId); activePolyline.setMap(null); startBtn.style.display = 'block'; btn.style.display = 'none'; return;
             }
-
             navigator.geolocation.clearWatch(watchId);
-            btn.innerText = "Calculations..."; 
-            btn.disabled = true;
-
+            btn.innerText = "Calculations..."; btn.disabled = true;
             try {
                 const turfCoords = pathCoords.map(p => [p.lng, p.lat]);
                 turfCoords.push([pathCoords[0].lng, pathCoords[0].lat]); 
                 const newPoly = turf.polygon([turfCoords]);
                 const rawArea = google.maps.geometry.spherical.computeArea(activePolyline.getPath());
                 let finalMyArea = rawArea;
-
                 const snapshot = await get(ref(db, 'territories'));
                 const territories = snapshot.val() || {};
                 const updates = {};
-                let stolenText = "";
-                let guardBlocked = false;
-
+                let stolenText = ""; let guardBlocked = false;
                 for (const [key, t] of Object.entries(territories)) {
                     if(!t.coords || t.owner === currentUser) continue;
                     const tCoords = t.coords.map(c => [c.lng, c.lat]);
                     tCoords.push([t.coords[0].lng, t.coords[0].lat]);
                     const existingPoly = turf.polygon([tCoords]);
                     const intersection = turf.intersect(newPoly, existingPoly);
-                    
                     if (intersection) {
                         const overlapArea = turf.area(intersection);
                         if (overlapArea > 0) {
                             let isProtected = false;
-                            if (t.guarded) {
-                                if (t.guardExpiry && t.guardExpiry > Date.now()) { isProtected = true; } 
-                                else { updates[`territories/${key}/guarded`] = null; }
-                            }
+                            if (t.guarded) { if (t.guardExpiry && t.guardExpiry > Date.now()) { isProtected = true; } else { updates[`territories/${key}/guarded`] = null; } }
                             if (isProtected) { guardBlocked = true; finalMyArea -= overlapArea; continue; }
-                            
                             const isAlly = myClanMembers[t.owner] ? true : false;
                             let currentEnemyArea = t.areaSize || 0;
                             const intersectCoords = intersection.geometry.coordinates[0].map(c => ({ lat: c[1], lng: c[0] }));
                             new google.maps.Polygon({ paths: intersectCoords, fillColor: "#ff0000", fillOpacity: 0.6, strokeColor: "#ff0000", strokeWeight: 2, map: map });
-
                             if (isAlly) {
                                 let newEnemyArea = Math.max(0, currentEnemyArea - (overlapArea / 2));
                                 updates[`territories/${key}/areaSize`] = newEnemyArea;
@@ -492,117 +398,63 @@
                         }
                     }
                 }
-
                 if (guardBlocked) alert("⚠️ GUARD ENCOUNTERED! ⚠️\nProtected areas were not captured.");
-
                 if (finalMyArea > 10) {
                     const newKey = push(ref(db, 'territories')).key;
                     updates[`territories/${newKey}`] = { owner: currentUser, coords: pathCoords, areaSize: finalMyArea, timestamp: Date.now(), source: 'Battle' };
-
                     if(myClan) {
                         const clanSnap = await get(ref(db, `clans/${myClan}`));
                         if(clanSnap.val() && clanSnap.val().activeWar) {
                              const warId = clanSnap.val().activeWar;
                              await runTransaction(ref(db, `clanWars/${warId}`), (war) => {
-                                if (war) {
-                                    if (war.challenger === myClan) war.challengerScore = (war.challengerScore || 0) + finalMyArea;
-                                    else if (war.defender === myClan) war.defenderScore = (war.defenderScore || 0) + finalMyArea;
-                                }
+                                if (war) { if (war.challenger === myClan) war.challengerScore = (war.challengerScore || 0) + finalMyArea; else if (war.defender === myClan) war.defenderScore = (war.defenderScore || 0) + finalMyArea; }
                                 return war;
                              });
                         }
                     }
-
                     let pointMsg = "";
                     if (finalMyArea >= 1000) {
-                        const now = new Date();
-                        const todayStr = now.toDateString();
-                        const lastDate = lastConquestDate ? new Date(lastConquestDate) : null;
-                        let newStreak = 1;
-                        let pointsToAdd = 0;
+                        const now = new Date(); const todayStr = now.toDateString(); const lastDate = lastConquestDate ? new Date(lastConquestDate) : null;
+                        let newStreak = 1; let pointsToAdd = 0;
                         if (!lastDate || lastDate.toDateString() !== todayStr) {
-                             if (lastDate) {
-                                const oneDay = 24 * 60 * 60 * 1000;
-                                const diffDays = Math.round(Math.abs((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(lastDate.getFullYear(), lastDate.getMonth(), lastDate.getDate())) / oneDay));
-                                if (diffDays === 1) newStreak = currentStreak + 1;
-                            }
+                             if (lastDate) { const oneDay = 24 * 60 * 60 * 1000; const diffDays = Math.round(Math.abs((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(lastDate.getFullYear(), lastDate.getMonth(), lastDate.getDate())) / oneDay)); if (diffDays === 1) newStreak = currentStreak + 1; }
                             pointsToAdd = calculateNewPoints(newStreak);
                         } else { newStreak = currentStreak; pointMsg = "\n(Daily points already claimed)"; }
-                        
-                        if (pointsToAdd > 0) {
-                            pointMsg = `\n+${pointsToAdd} Credit Points! (Streak: ${newStreak})`;
-                            updates[`users/${currentUser}/creditPoints`] = totalPoints + pointsToAdd;
-                        }
-                        updates[`users/${currentUser}/streak`] = newStreak;
-                        updates[`users/${currentUser}/lastActiveDate`] = Date.now();
+                        if (pointsToAdd > 0) { pointMsg = `\n+${pointsToAdd} Credit Points! (Streak: ${newStreak})`; updates[`users/${currentUser}/creditPoints`] = totalPoints + pointsToAdd; }
+                        updates[`users/${currentUser}/streak`] = newStreak; updates[`users/${currentUser}/lastActiveDate`] = Date.now();
                     }
-
                     await update(ref(db), updates);
                     alert(`Conquest Complete!\nClaimed: ${Math.round(finalMyArea)} m²${stolenText}${pointMsg}`);
                 } else { alert("Area too small or blocked by guards."); }
-
-            } catch(e) { 
-                console.error(e); 
-                alert("Error during calculation: " + e.message); 
-            } finally {
-                activePolyline.setMap(null);
-                startBtn.style.display = 'block'; 
-                btn.style.display = 'none';
-                btn.disabled = false;
-                btn.innerText = "🚩 Claim Territory";
-            }
+            } catch(e) { console.error(e); alert("Error during calculation: " + e.message); } 
+            finally { activePolyline.setMap(null); startBtn.style.display = 'block'; btn.style.display = 'none'; btn.disabled = false; btn.innerText = "🚩 Claim Territory"; }
         });
 
         function loadTerritories() {
             onValue(ref(db, 'territories'), (snapshot) => {
                 const data = snapshot.val();
                 visualPolygons.forEach(obj => { obj.poly.setMap(null); if(obj.marker) obj.marker.setMap(null); });
-                visualPolygons = [];
-                allPolygons = []; 
-                loadStatsAndRank(data || {});
-
+                visualPolygons = []; allPolygons = []; loadStatsAndRank(data || {});
                 if (data) Object.entries(data).forEach(([key, t]) => { 
                     const tCoords = t.coords.map(c => [c.lng, c.lat]);
                     tCoords.push([t.coords[0].lng, t.coords[0].lat]);
                     const turfPoly = turf.polygon([tCoords]);
                     allPolygons.push({ id: key, data: t, polygon: turfPoly });
-
                     const isMine = t.owner === currentUser;
                     const isAlly = myClan && myClanMembers[t.owner];
-                    
                     if (isMine || isAlly) {
                         let isActiveGuard = t.guarded && (!t.guardExpiry || t.guardExpiry > Date.now());
-                        let strokeC = isActiveGuard ? '#FFD700' : '#222';
-                        let strokeW = isActiveGuard ? 3 : 1;
-                        let fillC = isMine ? '#00e676' : '#C5A059'; 
-                        
-                        const poly = new google.maps.Polygon({ 
-                            paths: t.coords, fillColor: fillC, fillOpacity: 0.25, strokeColor: strokeC, strokeWeight: strokeW, map: map, clickable: true, zIndex: isActiveGuard ? 10 : 1
-                        });
-
-                        poly.addListener('click', () => {
-                            if (isActiveGuard) {
-                                const daysLeft = Math.ceil((t.guardExpiry - Date.now())/(1000*60*60*24));
-                                alert(`Protected.\nExpires in ${daysLeft} days.`);
-                            } else {
-                                window.openDeploymentModal(key, t.areaSize || 0, !isMine);
-                            }
-                        });
-                        
+                        let strokeC = isActiveGuard ? '#FFD700' : '#222'; let strokeW = isActiveGuard ? 3 : 1; let fillC = isMine ? '#00e676' : '#C5A059'; 
+                        const poly = new google.maps.Polygon({ paths: t.coords, fillColor: fillC, fillOpacity: 0.25, strokeColor: strokeC, strokeWeight: strokeW, map: map, clickable: true, zIndex: isActiveGuard ? 10 : 1 });
+                        poly.addListener('click', () => { if (isActiveGuard) { const daysLeft = Math.ceil((t.guardExpiry - Date.now())/(1000*60*60*24)); alert(`Protected.\nExpires in ${daysLeft} days.`); } else { window.openDeploymentModal(key, t.areaSize || 0, !isMine); } });
                         let marker = null;
-                        if(isActiveGuard) {
-                            const bounds = new google.maps.LatLngBounds();
-                            t.coords.forEach(c => bounds.extend(c));
-                            marker = new google.maps.Marker({ position: bounds.getCenter(), map: map, label: { text: "🛡️", fontSize: "16px" }, icon: { path: google.maps.SymbolPath.CIRCLE, scale: 0 } });
-                        }
+                        if(isActiveGuard) { const bounds = new google.maps.LatLngBounds(); t.coords.forEach(c => bounds.extend(c)); marker = new google.maps.Marker({ position: bounds.getCenter(), map: map, label: { text: "🛡️", fontSize: "16px" }, icon: { path: google.maps.SymbolPath.CIRCLE, scale: 0 } }); }
                         visualPolygons.push({ poly, marker });
                     }
                 });
             });
         }
-
-        // --- LOAD GOOGLE MAPS DYNAMICALLY ---
-        loadGoogleMaps();
     </script>
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAzfoxuzRbmyrhGChfTEWB05xvyNRmvK3k&libraries=geometry&callback=initMap"></script>
 </body>
 </html>
