@@ -44,7 +44,6 @@
         button { padding: 15px; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: bold; cursor: pointer; font-family: 'Cinzel', serif; text-transform: uppercase; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         #startBtn { background: linear-gradient(180deg, #00e676, #00c853); color: #003300; }
         
-        /* Updated Stop Button for Dynamic Feedback */
         #stopBtn { background: linear-gradient(180deg, #ff1744, #d50000); color: white; display: none; transition: 0.3s; }
         #stopBtn.ready { background: linear-gradient(180deg, #FFD700, #B8860B); color: black; animation: pulse 2s infinite; border: 2px solid #fff; }
 
@@ -159,7 +158,6 @@
 
         window.logout = function() { if(confirm("Logout?")) { localStorage.clear(); window.location.href = 'index.html'; }};
         
-        // --- 1. GLOBAL INITMAP DEFINITION ---
         window.initMap = function() {
             const mapEl = document.getElementById("map");
             if (!mapEl) return;
@@ -179,7 +177,6 @@
             }
         };
 
-        // --- 2. DYNAMIC SCRIPT LOADER ---
         function loadGoogleMaps() {
             if (window.google && window.google.maps) {
                 window.initMap();
@@ -406,11 +403,9 @@
                             const r = indoorDistance / (2 * Math.PI);
                             const area = Math.PI * r * r;
                             
-                            // UPDATE UI
                             document.getElementById('indDistLarge').innerText = Math.round(indoorDistance);
                             document.getElementById('indAreaLarge').innerText = Math.round(area) + " m²";
                             
-                            // UPDATE BUTTON FEEDBACK
                             stopBtn.innerText = `💾 Bank Area (${Math.round(area)} m²)`;
                             if (area >= 1000) {
                                 stopBtn.classList.add('ready');
@@ -425,13 +420,17 @@
             }
         });
 
+        // --- STREAK-BASED POINT LOGIC ---
         function calculateNewPoints(streakDay) {
             if (streakDay === 1) return 1;
             if (streakDay === 2) return 2;
             if (streakDay === 3) return 4;
             if (streakDay === 4) return 6;
-            if (streakDay >= 5 && streakDay <= 21) return 5;
-            if (streakDay >= 22) return 8;
+            if (streakDay === 5) return 5;
+            if (streakDay >= 6 && streakDay <= 21) return 2;
+            if (streakDay >= 22 && streakDay <= 90) return 3;
+            if (streakDay >= 91 && streakDay <= 365) return 3;
+            if (streakDay > 365) return 3; 
             return 1; 
         }
 
@@ -457,10 +456,18 @@
                 if (finalArea >= 1000) {
                     const now = new Date(); const todayStr = now.toDateString(); const lastDate = lastConquestDate ? new Date(lastConquestDate) : null;
                     let newStreak = 1; let pointsToAdd = 0;
+                    
                     if (!lastDate || lastDate.toDateString() !== todayStr) {
-                         if (lastDate) { const oneDay = 24 * 60 * 60 * 1000; const diffDays = Math.round(Math.abs((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(lastDate.getFullYear(), lastDate.getMonth(), lastDate.getDate())) / oneDay)); if (diffDays === 1) newStreak = currentStreak + 1; }
+                         if (lastDate) { 
+                            const oneDay = 24 * 60 * 60 * 1000; 
+                            const diffDays = Math.round(Math.abs((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(lastDate.getFullYear(), lastDate.getMonth(), lastDate.getDate())) / oneDay)); 
+                            if (diffDays === 1) newStreak = currentStreak + 1;
+                        }
                         pointsToAdd = calculateNewPoints(newStreak);
-                    } else { newStreak = currentStreak; pointMsg = "\n(Daily points already claimed)"; }
+                    } else { 
+                        newStreak = currentStreak; 
+                        pointMsg = "\n(Daily streak points already claimed)"; 
+                    }
                     
                     if (pointsToAdd > 0) {
                         pointMsg = `\n+${pointsToAdd} Credit Points! (Streak: ${newStreak})`;
@@ -576,7 +583,10 @@
                                 if (diffDays === 1) newStreak = currentStreak + 1;
                             }
                             pointsToAdd = calculateNewPoints(newStreak);
-                        } else { newStreak = currentStreak; pointMsg = "\n(Daily points already claimed)"; }
+                        } else { 
+                            newStreak = currentStreak; 
+                            pointMsg = "\n(Daily streak points already claimed)"; 
+                        }
                         
                         if (pointsToAdd > 0) {
                             pointMsg = `\n+${pointsToAdd} Credit Points! (Streak: ${newStreak})`;
@@ -650,7 +660,6 @@
             });
         }
 
-        // --- LOAD GOOGLE MAPS DYNAMICALLY ---
         loadGoogleMaps();
     </script>
 </body>
