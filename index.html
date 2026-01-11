@@ -47,6 +47,17 @@
 
         .signup-link { margin-top: 25px; display: block; color: #888; text-decoration: none; font-size: 0.9rem; }
         .signup-link span { color: #C5A059; font-weight: bold; text-decoration: underline; }
+
+        /* --- USERNAME MODAL STYLES --- */
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.9); align-items: center; justify-content: center;
+        }
+        .modal-content {
+            background: #1a1a1a; padding: 30px; border: 2px solid #C5A059; 
+            border-radius: 8px; width: 300px; text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -66,13 +77,21 @@
         <a href="signup.html" class="signup-link">New Conqueror? <span>Recruit Here</span></a>
     </div>
 
+    <div id="usernameModal" class="modal">
+        <div class="modal-content">
+            <h3 style="color:#C5A059; font-family:'Cinzel', serif;">Choose Your Name</h3>
+            <p style="color:#888; font-size:0.9rem;">How shall you be known in the realm?</p>
+            <input type="text" id="customUsername" placeholder="Enter unique username" maxlength="12">
+            <button id="confirmNameBtn">Begin Journey</button>
+        </div>
+    </div>
+
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-        import { getDatabase, ref, get, child, update } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+        import { getDatabase, ref, get, child, update, query, orderByChild, equalTo } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
-        import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-analytics.js";
 
-        // --- YOUR CONFIGURATION ---
+        // --- REPLACE WITH YOUR CONFIG ---
         const firebaseConfig = {
             apiKey: "AIzaSyBl1rBmCWbTZIdZTRndkoNVL9wIYHD7UWo",
             authDomain: "runmate-cb328.firebaseapp.com",
@@ -84,90 +103,109 @@
             measurementId: "G-PFL5J88K8Y"
         };
 
-        // Initialize Firebase
         const app = initializeApp(firebaseConfig);
-        const analytics = getAnalytics(app);
         const db = getDatabase(app);
         const auth = getAuth(app);
 
-        // --- 1. MANUAL LOGIN LOGIC ---
-        document.getElementById('loginBtn').addEventListener('click', async () => {
-            const userIn = document.getElementById('username');
-            const passIn = document.getElementById('password');
-            const btn = document.getElementById('loginBtn');
-            const user = userIn.value.trim();
-            const pass = passIn.value.trim();
-            
-            if(!user || !pass) return alert("Identify yourself, warrior!");
+        let pendingUser = null; // Store Google user temporarily
 
-            btn.disabled = true;
-            btn.innerText = "Verifying...";
+        // --- 1. MANUAL LOGIN ---
+        document.getElementById('loginBtn').addEventListener('click', async () => {
+            const userIn = document.getElementById('username').value.trim();
+            const passIn = document.getElementById('password').value.trim();
+            
+            if(!userIn || !passIn) return alert("Identify yourself, warrior!");
 
             try {
-                const snapshot = await get(child(ref(db), `users/${user}`));
-                if (snapshot.exists() && snapshot.val().password === pass) {
-                    localStorage.setItem('currentUser', user);
-                    localStorage.setItem('userIcon', snapshot.val().icon || '👤');
-                    window.location.href = 'dashboard.html';
+                // For manual login, we assume the 'key' in users/ path is the username
+                // Or you might be using a separate Auth UID. 
+                // Based on your previous code, you were using direct paths.
+                // NOTE: This assumes manual signup created a path `users/${userIn}`
+                const snapshot = await get(child(ref(db), `users/${userIn}`));
+                
+                if (snapshot.exists() && snapshot.val().password === passIn) {
+                    completeLogin(userIn, snapshot.val().icon);
                 } else {
                     alert("Access Denied.");
-                    btn.disabled = false;
-                    btn.innerText = "Open The Gates";
                 }
-            } catch(e) { 
-                alert("Connection Error: " + e.message); 
-                btn.disabled = false;
-            }
+            } catch(e) { alert("Error: " + e.message); }
         });
 
-        // --- 2. SOCIAL LOGIN LOGIC (GOOGLE) ---
+        // --- 2. SOCIAL LOGIN TRIGGER ---
         document.getElementById('googleBtn').addEventListener('click', async () => {
             const provider = new GoogleAuthProvider();
-            
             try {
                 const result = await signInWithPopup(auth, provider);
                 const user = result.user;
-                const userId = user.uid; // Unique Google User ID
-                
-                // --- INITIALIZE USER DATA ---
-                // We check if this user exists. If not, we set default values.
-                const updates = {};
-                updates[`users/${userId}/lastLogin`] = Date.now();
-                updates[`users/${userId}/email`] = user.email;
-                
+                const userId = user.uid;
+
+                // Check if user already exists in DB
                 const snap = await get(child(ref(db), `users/${userId}`));
-                
-                if (!snap.exists()) {
-                    // Set defaults for new Social User
-                    updates[`users/${userId}/creditPoints`] = 0;
-                    updates[`users/${userId}/bankedArea`] = 0;
-                    updates[`users/${userId}/streak`] = 0;
-                    updates[`users/${userId}/icon`] = user.photoURL || "🛡️"; 
-                    updates[`users/${userId}/displayName`] = user.displayName;
-                }
 
-                // Save to Database
-                await update(ref(db), updates);
-
-                // Save Session Locally
-                localStorage.setItem('currentUser', userId);
-                localStorage.setItem('userIcon', user.photoURL || "🛡️");
-                
-                // Redirect to Dashboard
-                window.location.href = 'dashboard.html';
-
-            } catch (error) {
-                console.error("Login Error:", error);
-                // Handle specific Firebase Errors
-                if (error.code === 'auth/unauthorized-domain') {
-                    alert("Setup Error: This domain (e.g., localhost) is not authorized in Firebase Console > Auth > Settings.");
-                } else if (error.code === 'auth/popup-closed-by-user') {
-                    // Ignore, user just closed the window
+                if (snap.exists()) {
+                    // USER EXISTS: Login immediately
+                    completeLogin(userId, snap.val().icon || "🛡️");
                 } else {
-                    alert("Login Failed: " + error.message);
+                    // NEW USER: Show Modal to pick name
+                    pendingUser = user; // Save google data
+                    document.getElementById('usernameModal').style.display = 'flex';
                 }
+            } catch (error) {
+                console.error(error);
+                alert("Login Failed: " + error.message);
             }
         });
+
+        // --- 3. CONFIRM CUSTOM USERNAME ---
+        document.getElementById('confirmNameBtn').addEventListener('click', async () => {
+            const desiredName = document.getElementById('customUsername').value.trim();
+            const btn = document.getElementById('confirmNameBtn');
+
+            if(desiredName.length < 3) return alert("Name too short!");
+            if(!pendingUser) return alert("Session expired. Login again.");
+
+            btn.innerText = "Checking...";
+            btn.disabled = true;
+
+            // CHECK IF USERNAME IS TAKEN
+            // We query the 'users' path to see if any 'displayName' matches
+            const q = query(ref(db, 'users'), orderByChild('displayName'), equalTo(desiredName));
+            const nameSnap = await get(q);
+
+            if (nameSnap.exists()) {
+                alert("This name is already taken by another conqueror!");
+                btn.innerText = "Begin Journey";
+                btn.disabled = false;
+                return;
+            }
+
+            // NAME AVAILABLE: Create Account
+            const userId = pendingUser.uid;
+            const updates = {};
+            
+            updates[`users/${userId}`] = {
+                displayName: desiredName, // The Custom Name
+                email: pendingUser.email,
+                lastLogin: Date.now(),
+                creditPoints: 0,
+                bankedArea: 0,
+                streak: 0,
+                icon: pendingUser.photoURL || "🛡️"
+            };
+
+            await update(ref(db), updates);
+            
+            // Close modal and login
+            document.getElementById('usernameModal').style.display = 'none';
+            completeLogin(userId, pendingUser.photoURL || "🛡️");
+        });
+
+        // --- HELPER: FINALIZE LOGIN ---
+        function completeLogin(uid, icon) {
+            localStorage.setItem('currentUser', uid);
+            localStorage.setItem('userIcon', icon || '👤');
+            window.location.href = 'dashboard.html';
+        }
     </script>
 </body>
 </html>
