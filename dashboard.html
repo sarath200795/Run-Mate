@@ -20,7 +20,7 @@
             display: flex; flex-direction: column; gap: 15px;
         }
 
-        /* --- HEADER & NAME FIX --- */
+        /* --- HEADER --- */
         .profile-header {
             text-align: center;
             margin-bottom: 20px;
@@ -28,18 +28,36 @@
             padding: 20px;
             border-radius: 12px;
             border: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
-        .user-icon { font-size: 3rem; margin-bottom: 10px; display: block; }
+        /* FIX: Container for the icon/image */
+        .user-icon-container {
+            width: 80px; 
+            height: 80px; 
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3rem; /* For Emojis */
+        }
         
-        /* THIS FIXES THE OVERLAPPING NAME */
+        /* FIX: Style for the Image tag if used */
+        .profile-img {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 2px solid #C5A059;
+            object-fit: cover;
+        }
+        
         .user-name { 
             font-family: 'Cinzel', serif; 
             font-size: 1.8rem; 
             color: #C5A059;
             margin: 0;
-            
-            /* Safety for long names */
             white-space: nowrap; 
             overflow: hidden; 
             text-overflow: ellipsis; 
@@ -84,7 +102,8 @@
 
     <div class="container">
         <div class="profile-header">
-            <span class="user-icon" id="dIcon">👤</span>
+            <div class="user-icon-container" id="dIcon"></div>
+            
             <div class="user-name" id="dName">Loading...</div>
             <div class="clan-tag" id="statusText">...</div>
         </div>
@@ -146,18 +165,28 @@
         const currentUser = localStorage.getItem('currentUser');
         if(!currentUser) window.location.href = 'index.html';
 
-        // Display Name Fix
         document.getElementById('dName').innerText = currentUser;
         
         // --- LOAD USER DATA ---
         onValue(ref(db, `users/${currentUser}`), (snap) => {
             const data = snap.val();
             if (data) {
-                // Check if there is a display name from Google, else use ID
+                // 1. Handle Display Name
                 const displayName = data.displayName || currentUser;
                 document.getElementById('dName').innerText = displayName;
                 
-                document.getElementById('dIcon').innerText = data.icon || "👤";
+                // 2. Handle Icon (Logic Fix)
+                const iconData = data.icon || "👤";
+                const iconContainer = document.getElementById('dIcon');
+                
+                // Check if the icon string is a URL (starts with http)
+                if (iconData.startsWith('http')) {
+                    iconContainer.innerHTML = `<img src="${iconData}" class="profile-img" alt="Profile">`;
+                } else {
+                    iconContainer.innerHTML = iconData; // It's an emoji
+                }
+
+                // 3. Stats & Clan
                 document.getElementById('myPoints').innerText = data.creditPoints || 0;
                 
                 if (data.clan) {
