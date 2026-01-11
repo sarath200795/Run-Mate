@@ -4,6 +4,7 @@
     <title>Enter the Realm</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         body { 
             font-family: 'Segoe UI', sans-serif; 
@@ -17,17 +18,37 @@
             border: 2px solid #C5A059; box-shadow: 0 0 25px rgba(197, 160, 89, 0.2); 
         }
         h2 { font-family: 'Cinzel', serif; color: #C5A059; font-size: 2rem; text-transform: uppercase; margin-bottom: 20px; }
+        
+        /* Input Fields */
         input { 
             width: 100%; padding: 12px; margin: 10px 0; border-radius: 4px; 
             border: 1px solid #554422; background: #0a0a0a; color: #C5A059; 
             box-sizing: border-box; font-family: 'Cinzel', serif; font-size: 1rem;
         }
+
+        /* Standard Button */
         button { 
             width: 100%; padding: 12px; background: linear-gradient(180deg, #D4AF37 0%, #AA8A26 100%);
             border: 1px solid #FFD700; font-weight: bold; cursor: pointer; border-radius: 4px; 
             margin-top: 15px; font-size: 1.1rem; color: #220000; font-family: 'Cinzel', serif; text-transform: uppercase;
         }
         button:disabled { background: #444; color: #888; cursor: not-allowed; }
+
+        /* Social Divider */
+        .divider { margin: 20px 0; font-size: 0.8rem; color: #666; display: flex; align-items: center; }
+        .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: #444; }
+        .divider::before { margin-right: 10px; } .divider::after { margin-left: 10px; }
+
+        /* Google Button Style */
+        .btn-google {
+            background: #ffffff; color: #333; border: 1px solid #ccc;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            font-family: 'Segoe UI', sans-serif; text-transform: none;
+            transition: background 0.2s;
+        }
+        .btn-google:hover { background: #f1f1f1; }
+        .btn-google i { color: #DB4437; font-size: 1.2rem; }
+
         .signup-link { margin-top: 25px; display: block; color: #888; text-decoration: none; font-size: 0.9rem; }
         .signup-link span { color: #C5A059; font-weight: bold; text-decoration: underline; }
     </style>
@@ -35,20 +56,31 @@
 <body>
     <div class="card">
         <h2>Enter Realm</h2>
+        
         <input type="text" id="username" placeholder="Conqueror Name">
         <input type="password" id="password" placeholder="Secret Key">
         <button id="loginBtn">Open The Gates</button>
+        
+        <div class="divider">OR JOIN WITH</div>
+        
+        <button id="googleBtn" class="btn-google">
+            <i class="fab fa-google"></i> Login with Google
+        </button>
+
         <a href="signup.html" class="signup-link">New Conqueror? <span>Recruit Here</span></a>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-        import { getDatabase, ref, get, child } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+        import { getDatabase, ref, get, child, update } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
 
         const firebaseConfig = { databaseURL: "https://runmate-cb328-default-rtdb.firebaseio.com/" };
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
+        const auth = getAuth(app);
 
+        // --- 1. MANUAL LOGIN LOGIC ---
         document.getElementById('loginBtn').addEventListener('click', async () => {
             const userIn = document.getElementById('username');
             const passIn = document.getElementById('password');
@@ -75,6 +107,43 @@
             } catch(e) { 
                 alert("Connection Error: " + e.message); 
                 btn.disabled = false;
+            }
+        });
+
+        // --- 2. SOCIAL LOGIN LOGIC (GOOGLE) ---
+        document.getElementById('googleBtn').addEventListener('click', async () => {
+            const provider = new GoogleAuthProvider();
+            try {
+                const result = await signInWithPopup(auth, provider);
+                const user = result.user;
+                const userId = user.uid; // Unique ID from Google
+                
+                // Initialize User Data in DB if first time
+                const updates = {};
+                updates[`users/${userId}/lastLogin`] = Date.now();
+                updates[`users/${userId}/email`] = user.email;
+                
+                // Check if profile exists, if not create defaults
+                const snap = await get(child(ref(db), `users/${userId}`));
+                if (!snap.exists()) {
+                    updates[`users/${userId}/creditPoints`] = 0;
+                    updates[`users/${userId}/bankedArea`] = 0;
+                    updates[`users/${userId}/streak`] = 0;
+                    updates[`users/${userId}/icon`] = "🛡️"; 
+                }
+
+                await update(ref(db), updates);
+
+                // Save Session
+                localStorage.setItem('currentUser', userId);
+                localStorage.setItem('userIcon', user.photoURL || "🛡️");
+                
+                // Redirect
+                window.location.href = 'dashboard.html';
+
+            } catch (error) {
+                console.error(error);
+                alert("Social Login Failed: " + error.message);
             }
         });
     </script>
