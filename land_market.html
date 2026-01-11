@@ -8,14 +8,13 @@
     <style>
         body { margin: 0; padding: 0; background: #000; font-family: 'Segoe UI', sans-serif; height: 100vh; display: flex; flex-direction: column; }
         
-        /* HEADER */
         .header { background: #111; padding: 15px; border-bottom: 2px solid #C5A059; text-align: center; color: white; display:flex; justify-content:space-between; align-items:center; }
         .bank-display { color: #FFD700; font-weight: bold; font-size: 1.1rem; border: 1px solid #C5A059; padding: 5px 10px; border-radius: 4px; }
+        
         #map { flex: 1; position: relative; background: #e0e0e0; }
-
-        /* CONTROLS */
+        
         .controls { padding: 15px; background: #111; border-top: 1px solid #333; text-align: center; display:flex; gap:10px; justify-content: center; }
-        .btn-claim { flex: 2; background: #C5A059; color: black; border: none; padding: 15px; font-weight: bold; font-family: 'Cinzel', serif; font-size: 1rem; border-radius: 4px; cursor: pointer; }
+        .btn-claim { flex: 2; background: #C5A059; color: black; border: none; padding: 15px; font-weight: bold; font-family: 'Cinzel', serif; font-size: 1rem; border-radius: 4px; cursor: pointer; transition: 0.3s; }
         .btn-claim:disabled { background: #555; color: #888; cursor: not-allowed; }
         .btn-claim.confirm { background: #d32f2f; color: white; animation: pulse 1.5s infinite; }
         
@@ -23,7 +22,6 @@
 
         @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(211, 47, 47, 0); } 100% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0); } }
 
-        /* LEGEND */
         .legend { position: absolute; bottom: 20px; left: 10px; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 4px; font-size: 0.8rem; color: #ccc; pointer-events: none; z-index: 5; }
         .legend-item { display: flex; align-items: center; margin-bottom: 5px; }
         .color-box { width: 15px; height: 15px; margin-right: 8px; border: 1px solid #fff; }
@@ -54,8 +52,12 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
         import { getDatabase, ref, push, update, onValue, get } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
-        const GOOGLE_API_KEY = "AIzaSyAzfoxuzRbmyrhGChfTEWB05xvyNRmvK3k"; 
+        // --- REPLACE WITH YOUR FIREBASE CONFIG ---
         const firebaseConfig = { databaseURL: "https://runmate-cb328-default-rtdb.firebaseio.com/" };
+        
+        // --- API KEY (Ensure this is correct for Maps) ---
+        const GOOGLE_API_KEY = "AIzaSyAzfoxuzRbmyrhGChfTEWB05xvyNRmvK3k"; 
+
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
         const currentUser = localStorage.getItem('currentUser');
@@ -157,24 +159,39 @@
             }
         }
 
+        // --- UPDATED VALIDATION LOGIC WITH FEEDBACK ---
         function validatePlacement(currentCoords) {
             const turfCoords = currentCoords.map(c => [c.lng, c.lat]);
             turfCoords.push([currentCoords[0].lng, currentCoords[0].lat]); 
             const newPoly = turf.polygon([turfCoords]);
 
             let touchesEnemy = false, isValid = true;
+            let statusMsg = ""; // Stores the specific error message
 
             for(const existing of allPolygons) {
                 if (turf.booleanIntersects(newPoly, existing.turfPoly)) { 
-                    if (existing.owner === currentUser) { isValid = false; break; }
-                    if (myClanId && existing.clan === myClanId) { isValid = false; break; }
+                    
+                    // 1. Check for Own Land
+                    if (existing.owner === currentUser) { 
+                        isValid = false; 
+                        statusMsg = "OWN LAND DETECTED"; 
+                        break; 
+                    }
+                    
+                    // 2. Check for Clan Ally
+                    if (myClanId && existing.clan === myClanId) { 
+                        isValid = false; 
+                        statusMsg = "CLAN LAND DETECTED"; 
+                        break; 
+                    }
+                    
+                    // If we reach here, it's valid enemy territory
                     touchesEnemy = true;
                 }
             }
-            return { isValid, touchesEnemy };
+            return { isValid, touchesEnemy, statusMsg };
         }
 
-        // --- CONSISTENCY POINT LOGIC (Same as Game.html) ---
         function calculateNewPoints(streakDay) {
             if (streakDay === 1) return 1;
             if (streakDay === 2) return 2;
@@ -183,7 +200,7 @@
             if (streakDay === 5) return 5;
             if (streakDay >= 6 && streakDay <= 21) return 2;
             if (streakDay >= 22 && streakDay <= 90) return 3;
-            if (streakDay >= 91 && streakDay <= 365) return 4;
+            if (streakDay >= 91 && streakDay <= 365) return 3;
             if (streakDay > 365) return 3; 
             return 1; 
         }
@@ -203,17 +220,27 @@
                     draggable: true, map: map, zIndex: 100
                 });
 
+                // Attach Drag Listener for Real-Time Validation
                 google.maps.event.addListener(previewPolygon, 'dragend', function() {
                     const newCoords = this.getPath().getArray().map(p => ({ lat: p.lat(), lng: p.lng() }));
                     previewCoords = newCoords;
+                    
+                    // Check validity
                     const check = validatePlacement(newCoords);
 
                     if(!check.isValid) {
-                        this.setOptions({ fillColor: "#d32f2f" }); 
-                        btn.disabled = true; btn.innerText = "INVALID OVERLAP"; btn.classList.remove('confirm');
+                        // INVALID: Show Red & Disable Button with Reason
+                        this.setOptions({ fillColor: "#d32f2f", strokeColor: "#d32f2f" }); 
+                        btn.disabled = true; 
+                        btn.innerText = check.statusMsg || "INVALID OVERLAP"; 
+                        btn.classList.remove('confirm');
+                        btn.style.background = "#555";
                     } else {
-                        this.setOptions({ fillColor: "#FFD700" }); 
+                        // VALID: Show Gold & Enable Button
+                        this.setOptions({ fillColor: "#FFD700", strokeColor: "#FFD700" }); 
                         btn.disabled = false; 
+                        btn.style.background = "#C5A059";
+                        
                         if(check.touchesEnemy) {
                             btn.innerText = "ATTACK & CLAIM"; btn.classList.add('confirm');
                         } else {
@@ -222,6 +249,7 @@
                     }
                 });
                 
+                // Run validation once immediately
                 google.maps.event.trigger(previewPolygon, 'dragend');
                 isPreviewMode = true;
                 return;
@@ -229,70 +257,76 @@
 
             // 2. CONFIRM MODE
             if (isPreviewMode && previewCoords) {
+                // Final safety check
+                const check = validatePlacement(previewCoords);
+                if(!check.isValid) {
+                    alert("Cannot capture: " + check.statusMsg);
+                    return;
+                }
+
                 if(!confirm(`Finalize capture of ${Math.round(bankAmount)} m²?`)) return;
 
                 const updates = {};
                 const newKey = push(ref(db, 'territories')).key;
                 
-                // Territory Data
                 updates[`territories/${newKey}`] = { 
                     owner: currentUser, clanId: myClanId || null, coords: previewCoords, areaSize: bankAmount, timestamp: Date.now(), source: 'Market' 
                 };
-                
-                // Deduct Bank
                 updates[`users/${currentUser}/bankedArea`] = 0; 
 
-                // --- STREAK & POINTS LOGIC (UPDATED) ---
+                // --- STREAK & POINTS LOGIC ---
                 const userRef = ref(db, `users/${currentUser}`);
                 const userSnap = await get(userRef);
                 const userData = userSnap.val();
-                
-                const currentPoints = userData.creditPoints || 0;
-                const currentStreak = userData.streak || 0;
-                const lastDateVal = userData.lastActiveDate || 0;
-                
                 let pointMsg = "";
                 let pointsToAdd = 0;
-                let newStreak = currentStreak;
+                let newStreak = userData.streak || 0;
 
-                // Only reward points if Area > 1000m² (Consistency Check)
                 if (bankAmount >= 1000) {
                     const now = new Date();
                     const todayStr = now.toDateString();
-                    const lastDate = lastDateVal ? new Date(lastDateVal) : null;
+                    const lastDate = userData.lastActiveDate ? new Date(userData.lastActiveDate) : null;
 
                     if (!lastDate || lastDate.toDateString() !== todayStr) {
-                         // Check consecutive days
                          if (lastDate) { 
                             const oneDay = 24 * 60 * 60 * 1000; 
                             const diffDays = Math.round(Math.abs((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(lastDate.getFullYear(), lastDate.getMonth(), lastDate.getDate())) / oneDay)); 
-                            if (diffDays === 1) newStreak = currentStreak + 1;
-                            else newStreak = 1; // Reset if missed a day
-                        } else {
-                            newStreak = 1; // First day ever
-                        }
+                            if (diffDays === 1) newStreak++;
+                            else newStreak = 1;
+                        } else { newStreak = 1; }
                         
                         pointsToAdd = calculateNewPoints(newStreak);
                         pointMsg = `\n+${pointsToAdd} Credit Points! (Streak: ${newStreak})`;
-                        
                         updates[`users/${currentUser}/streak`] = newStreak;
                         updates[`users/${currentUser}/lastActiveDate`] = Date.now();
-                        updates[`users/${currentUser}/creditPoints`] = currentPoints + pointsToAdd;
-                    } else {
-                        pointMsg = "\n(Daily streak points already claimed)";
+                        updates[`users/${currentUser}/creditPoints`] = (userData.creditPoints || 0) + pointsToAdd;
                     }
                 }
                 
-                // Process Enemies (Cutting Logic) - NO BONUS POINTS HERE NOW
+                // --- CAPTURE & NOTIFICATION LOGIC ---
                 const myTurfCoords = previewCoords.map(c => [c.lng, c.lat]);
                 myTurfCoords.push(myTurfCoords[0]);
                 const myTurfPoly = turf.polygon([myTurfCoords]);
 
                 allPolygons.forEach(target => {
+                    // Double Safety: Skip Self/Ally
+                    if (target.owner === currentUser) return; 
+                    if (myClanId && target.clan === myClanId) return;
+
                     if (turf.booleanIntersects(myTurfPoly, target.turfPoly)) {
                         const diff = turf.difference(target.turfPoly, myTurfPoly);
+                        
+                        // Push Notification
+                        const notifKey = push(ref(db, `notifications/${target.owner}`)).key;
+                        updates[`notifications/${target.owner}/${notifKey}`] = {
+                            title: "Territory Lost!",
+                            message: `Your land was captured by ${currentUser} via the Land Market.`,
+                            timestamp: Date.now(),
+                            read: false
+                        };
+
                         if (!diff) {
-                            updates[`territories/${target.id}`] = null; 
+                            updates[`territories/${target.id}`] = null; // Full delete
                         } else {
                             const type = diff.geometry.type;
                             let newC = [];
@@ -339,4 +373,3 @@
     </script>
 </body>
 </html>
-
