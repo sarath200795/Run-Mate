@@ -5,174 +5,209 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: radial-gradient(circle at center, #1a1a1a 0%, #000000 100%); color: white; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
-        .container { width: 100%; max-width: 500px; position: relative; z-index: 1; }
-        .invites-wrapper { width: 100%; margin-bottom: 20px; display: none; }
-        .invite-card { background: linear-gradient(135deg, #330000 0%, #000 100%); border: 2px solid #ff4444; border-radius: 8px; padding: 15px; margin-bottom: 15px; text-align: center; box-shadow: 0 0 15px rgba(255, 0, 0, 0.5); animation: pulse 2s infinite; }
-        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.4); } 50% { box-shadow: 0 0 0 10px rgba(255, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 68, 68, 0); } }
-        .profile-card { background: rgba(30,30,30,0.95); padding: 20px; border-radius: 8px; border: 1px solid #C5A059; display: flex; align-items: center; gap: 20px; margin-bottom: 20px; }
-        .avatar { font-size: 3rem; border: 2px solid #C5A059; border-radius: 50%; padding: 10px; width: 60px; height: 60px; display: flex; justify-content: center; align-items: center; background: #000; }
-        .user-info h1 { margin: 0; font-family: 'Cinzel', serif; color: #C5A059; }
-        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; }
-        .stat-box { background: rgba(20,20,20,0.8); padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #444; }
-        .clickable-stat { cursor: pointer; border: 1px solid #00e676; }
-        .stat-val { font-size: 1.3rem; font-weight: bold; color: #00e676; }
-        .points-card { grid-column: span 2; border: 1px solid #FFD700; background: linear-gradient(90deg, #222 0%, #333 100%); cursor: pointer; transition: transform 0.1s; }
-        .points-card:active { transform: scale(0.98); }
-        .points-header { color: #FFD700; font-family: 'Cinzel', serif; margin-bottom: 5px; }
-        .bank-card { grid-column: span 2; border: 1px solid #C5A059; background: #1a0f00; display: flex; justify-content: space-between; align-items: center; padding: 15px; }
-        .btn-redeem { background: #C5A059; color: black; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold; cursor: pointer; }
-        .clan-section { background: #111; padding: 25px; border: 1px solid #554422; border-radius: 8px; margin-bottom: 20px; text-align: center; }
-        .btn-manage { background: #8B0000; color: white; width: 100%; padding: 15px; border: 1px solid #ff4444; cursor: pointer; font-family: 'Cinzel', serif; font-weight: bold; }
-        .btn-play { width: 100%; padding: 20px; background: linear-gradient(180deg, #D4AF37 0%, #AA8A26 100%); color: #220; border: 1px solid #FFD700; font-family: 'Cinzel', serif; font-weight: bold; font-size: 1.3rem; cursor: pointer; margin-top: 10px; }
-        .btn-nav { width: 100%; padding: 12px; background: #222; border: 1px solid #444; color: #aaa; margin-bottom: 10px; cursor: pointer; border-radius: 4px; font-weight: bold; }
-        .btn-nav:hover { background: #333; color: white; border-color: #666; }
-        .btn-war-nav { border-color: #ff4444; color: #ff4444; background: rgba(255, 68, 68, 0.05); }
-        .btn-accept-sm { background: #00e676; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold; cursor: pointer; margin-right: 10px; }
-        .btn-decline-sm { background: #333; border: 1px solid #ff4444; color:#ff4444; padding: 8px 15px; border-radius: 4px; cursor: pointer; }
+        /* --- GLOBAL LAYOUT --- */
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            background: radial-gradient(circle at center, #1a1a1a 0%, #000000 100%); 
+            color: white; margin: 0; padding: 20px; 
+            display: flex; flex-direction: column; align-items: center; 
+            min-height: 100vh;
+        }
+
+        .container { 
+            width: 100%; max-width: 500px; 
+            position: relative; z-index: 1; 
+            display: flex; flex-direction: column; gap: 15px;
+        }
+
+        /* --- HEADER & NAME FIX --- */
+        .profile-header {
+            text-align: center;
+            margin-bottom: 20px;
+            background: rgba(20, 20, 20, 0.8);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #333;
+        }
+
+        .user-icon { font-size: 3rem; margin-bottom: 10px; display: block; }
+        
+        /* THIS FIXES THE OVERLAPPING NAME */
+        .user-name { 
+            font-family: 'Cinzel', serif; 
+            font-size: 1.8rem; 
+            color: #C5A059;
+            margin: 0;
+            
+            /* Safety for long names */
+            white-space: nowrap; 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
+            max-width: 100%;
+            display: block;
+        }
+
+        .clan-tag { color: #888; font-size: 0.9rem; letter-spacing: 1px; margin-top: 5px; }
+
+        /* --- STAT GRID --- */
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .stat-card { 
+            background: #222; padding: 15px; border-radius: 8px; text-align: center; 
+            border: 1px solid #444; 
+        }
+        .stat-val { font-size: 1.4rem; font-weight: bold; color: #00e676; display: block;}
+        .stat-lbl { font-size: 0.8rem; color: #aaa; text-transform: uppercase; }
+
+        /* --- MENU ACTIONS --- */
+        .menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+        
+        .action-btn { 
+            padding: 20px; border: none; border-radius: 8px; cursor: pointer;
+            font-family: 'Cinzel', serif; font-size: 1rem; font-weight: bold;
+            transition: transform 0.2s; color: white;
+            display: flex; flex-direction: column; align-items: center; gap: 5px;
+        }
+        .action-btn:active { transform: scale(0.98); }
+
+        .btn-start { background: linear-gradient(135deg, #006400 0%, #004d00 100%); border: 1px solid #00e676; grid-column: span 2; }
+        .btn-market { background: #333; border: 1px solid #C5A059; color: #C5A059; }
+        .btn-social { background: #222; border: 1px solid #444; }
+        .btn-logout { background: #220000; border: 1px solid #ff4444; color: #ff8888; margin-top: 20px; width: 100%; padding: 15px; border-radius: 8px; cursor: pointer; }
+
+        /* --- CLAN CREATE SECTION --- */
+        #createClanSection { display: none; background: #1a1a1a; padding: 20px; border-radius: 8px; border: 1px solid #444; text-align: center; margin-top: 10px;}
+        input { width: 70%; padding: 10px; margin-bottom: 10px; background: #000; border: 1px solid #555; color: white; text-align: center;}
+        
     </style>
 </head>
 <body>
-<div class="container">
-    <div id="invitesPanel" class="invites-wrapper"></div>
-    <div class="profile-card">
-        <div class="avatar" id="displayIcon">...</div>
-        <div class="user-info"><h1 id="displayName">...</h1><p id="statusText">Loading...</p></div>
-    </div>
-    <div class="stats-grid">
-        <div class="stat-box points-card" onclick="window.showStreakDetails()">
-            <div class="points-header">CREDIT POINTS</div>
-            <span class="stat-val" id="creditPoints" style="color:#FFD700">0</span>
-            <div style="font-size:0.7rem; color:#aaa; margin-top:5px;">(Click for Streak Info)</div>
+
+    <div class="container">
+        <div class="profile-header">
+            <span class="user-icon" id="dIcon">👤</span>
+            <div class="user-name" id="dName">Loading...</div>
+            <div class="clan-tag" id="statusText">...</div>
         </div>
-        
-        <div class="stat-box bank-card">
-            <div style="text-align:left;">
-                <div style="color:#C5A059; font-weight:bold; font-size:0.9rem;">BANKED LAND</div>
-                <div id="bankedAreaDisplay" style="color:white; font-size:1.3rem; font-weight:bold;">0 m²</div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <span class="stat-val" id="myArea">0</span>
+                <span class="stat-lbl">Land Controlled (m²)</span>
             </div>
-            <button class="btn-redeem" onclick="window.location.href='land_market.html'">Redeem</button>
+            <div class="stat-card">
+                <span class="stat-val" id="myPoints" style="color:#FFD700">0</span>
+                <span class="stat-lbl">Credit Points</span>
+            </div>
         </div>
 
-        <div class="stat-box clickable-stat" onclick="window.location.href='personal_land.html'">
-            <span class="stat-val" id="myArea">0 m²</span><div style="font-size:0.7rem; color:#888;">Personal Land (View)</div>
+        <div class="menu-grid">
+            <button class="action-btn btn-start" onclick="window.location.href='game.html'">
+                <span>⚔️ ENTER CONQUEST</span>
+            </button>
+            
+            <button class="action-btn btn-market" onclick="window.location.href='land_market.html'">
+                <span>🏛️ MARKET</span>
+            </button>
+
+            <button class="action-btn btn-social" onclick="window.location.href='leaderboard.html'">
+                <span>🏆 RANKINGS</span>
+            </button>
+            
+            <button class="action-btn btn-social" onclick="window.location.href='personal_land.html'">
+                <span>🗺️ MY LANDS</span>
+            </button>
+            
+            <button class="action-btn btn-social" onclick="window.location.href='clan_manage.html'">
+                <span>🏰 CLAN HALL</span>
+            </button>
+            
+            <button class="action-btn btn-social" onclick="window.location.href='clan_wars.html'">
+                <span>🔥 WARS</span>
+            </button>
         </div>
+
+        <div id="createClanSection">
+            <h3 style="margin-top:0; color:#C5A059;">Found an Empire</h3>
+            <input type="text" id="newClanInput" placeholder="Enter Clan Name" maxlength="15">
+            <button class="action-btn btn-market" style="width:100%; padding:10px;" id="createBtn">CREATE</button>
+        </div>
+
+        <button class="btn-logout" onclick="logout()">LOGOUT</button>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+        import { getDatabase, ref, get, child, update, set, onValue } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+
+        const firebaseConfig = { databaseURL: "https://runmate-cb328-default-rtdb.firebaseio.com/" };
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
         
-        <div class="stat-box clickable-stat" style="border-color: #00bcd4;" onclick="window.location.href='clan_land.html'">
-            <span class="stat-val" id="clanArea" style="color:#00bcd4">---</span><div style="font-size:0.7rem; color:#888;">Clan Empire (View)</div>
-        </div>
-    </div>
+        const currentUser = localStorage.getItem('currentUser');
+        if(!currentUser) window.location.href = 'index.html';
 
-    <button onclick="window.location.href='personal_war.html'" class="btn-nav btn-war-nav">⚔️ Personal War Records</button>
-    <button onclick="window.location.href='clan_wars.html'" class="btn-nav btn-war-nav">🛡️ Clan War Room</button>
-    
-    <button onclick="window.location.href='personal_land.html'" class="btn-nav">🏰 My Territories & Guards</button>
-    
-    <button onclick="window.location.href='leaderboard.html'" class="btn-nav">🏆 View Global Leaderboards</button>
-
-    <div id="clanControlPanel" class="clan-section" style="display:none;">
-        <h3 id="myClanName" style="color:#C5A059; margin:0 0 10px 0; font-family:'Cinzel', serif;"></h3>
-        <button onclick="window.location.href='clan_manage.html'" class="btn-manage">🏛️ Enter Stronghold</button>
-    </div>
-
-    <div id="noClanPanel" class="clan-section" style="display:none;">
-        <h3 style="color:#aaa; font-family:'Cinzel', serif; margin:0 0 10px 0;">Join the Fray</h3>
-        <input type="text" id="newClanInput" placeholder="New Clan Name" style="padding:10px; width:60%; background:#222; border:1px solid #555; color:white;">
-        <button id="createBtn" style="padding:10px; background:#C5A059; border:none; font-weight:bold; cursor:pointer;">Create</button>
-    </div>
-
-    <button onclick="window.location.href='game.html'" class="btn-play">⚔️ March to War</button>
-    <div style="text-align:center; margin-top:30px; text-decoration:underline; cursor:pointer; color:#666;" onclick="logout()">Abandon Post (Logout)</div>
-</div>
-
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-    import { getDatabase, ref, update, onValue, get, child, set } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
-    const firebaseConfig = { databaseURL: "https://runmate-cb328-default-rtdb.firebaseio.com/" };
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-    const currentUser = localStorage.getItem('currentUser');
-    
-    let currentStreakData = 0;
-    if (!currentUser) window.location.href = 'index.html';
-    document.getElementById('displayName').innerText = currentUser;
-    document.getElementById('displayIcon').innerText = localStorage.getItem('userIcon') || '👤';
-
-    window.logout = function() { if(confirm("Logout?")) { localStorage.clear(); window.location.href = 'index.html'; }};
-
-    window.showStreakDetails = function() {
-        alert(`🔥 Current Streak: ${currentStreakData} Days\n\nKeep conquering at least 1000m² daily to maintain your streak and earn bonus points!`);
-    };
-
-    window.acceptInvite = async (newClanId) => {
-        if(!confirm(`Join ${newClanId}?`)) return;
-        const userSnap = await get(child(ref(db), `users/${currentUser}`));
-        const oldClan = userSnap.val().clan;
-        const updates = {};
-        if (oldClan) updates[`clans/${oldClan}/members/${currentUser}`] = null;
-        updates[`clans/${newClanId}/members/${currentUser}`] = true;
-        updates[`users/${currentUser}/clan`] = newClanId;
-        updates[`users/${currentUser}/invites/${newClanId}`] = null;
-        await update(ref(db), updates);
-        alert(`Joined ${newClanId}!`);
-    };
-
-    window.rejectInvite = async (clanId) => { if(!confirm("Ignore?")) return; await set(ref(db), `users/${currentUser}/invites/${clanId}`, null); };
-
-    onValue(ref(db, `users/${currentUser}`), (snapshot) => {
-        const user = snapshot.val();
-        if(!user) return; 
-        document.getElementById('creditPoints').innerText = user.creditPoints || 0;
-        document.getElementById('bankedAreaDisplay').innerText = Math.round(user.bankedArea || 0) + " m²";
-        currentStreakData = user.streak || 0;
-        const panel = document.getElementById('invitesPanel');
-        if (user.invites) {
-            panel.style.display = 'block';
-            panel.innerHTML = "";
-            Object.keys(user.invites).forEach(c => {
-                panel.innerHTML += `<div class="invite-card"><div class="invite-text">INVITE: <b>${c}</b></div><div><button class="btn-accept-sm" onclick="window.acceptInvite('${c}')">Accept</button><button class="btn-decline-sm" onclick="window.rejectInvite('${c}')">Reject</button></div></div>`;
-            });
-        } else { panel.style.display = 'none'; }
-        if (user.clan) {
-            document.getElementById('clanControlPanel').style.display = 'block';
-            document.getElementById('noClanPanel').style.display = 'none';
-            document.getElementById('myClanName').innerText = user.clan;
-            document.getElementById('statusText').innerText = `Warrior of ${user.clan}`;
-            loadClanStats(user.clan);
-        } else {
-            document.getElementById('clanControlPanel').style.display = 'none';
-            document.getElementById('noClanPanel').style.display = 'block';
-            document.getElementById('statusText').innerText = "Wandering Nomad";
-        }
-    });
-
-    document.getElementById('createBtn').addEventListener('click', async () => {
-        const name = document.getElementById('newClanInput').value.trim().toUpperCase();
-        if(!name) return;
-        const snap = await get(child(ref(db), `clans/${name}`));
-        if(snap.exists()) return alert("Taken!");
-        await set(ref(db, `clans/${name}`), { leader: currentUser, members: { [currentUser]: true }, created: Date.now() });
-        await update(ref(db, `users/${currentUser}`), { clan: name });
-    });
-
-    onValue(ref(db, 'territories'), (snap) => {
-        const data = snap.val() || {};
-        let myA = 0;
-        Object.values(data).forEach(t => { if(t.owner === currentUser) myA += (t.areaSize || 0); });
-        document.getElementById('myArea').innerText = Math.round(myA).toLocaleString() + " m²";
-    });
-
-    function loadClanStats(clanId) {
-        get(child(ref(db), `clans/${clanId}/members`)).then(mSnap => {
-            const members = mSnap.val() || {};
-            get(ref(db, 'territories')).then(tSnap => {
-                const data = tSnap.val() || {};
-                let cA = 0;
-                Object.values(data).forEach(t => { if(members[t.owner]) cA += (t.areaSize || 0); });
-                document.getElementById('clanArea').innerText = Math.round(cA).toLocaleString() + " m²";
-            });
+        // Display Name Fix
+        document.getElementById('dName').innerText = currentUser;
+        
+        // --- LOAD USER DATA ---
+        onValue(ref(db, `users/${currentUser}`), (snap) => {
+            const data = snap.val();
+            if (data) {
+                // Check if there is a display name from Google, else use ID
+                const displayName = data.displayName || currentUser;
+                document.getElementById('dName').innerText = displayName;
+                
+                document.getElementById('dIcon').innerText = data.icon || "👤";
+                document.getElementById('myPoints').innerText = data.creditPoints || 0;
+                
+                if (data.clan) {
+                    document.getElementById('statusText').innerText = `Member of [${data.clan}]`;
+                    document.getElementById('createClanSection').style.display = 'none';
+                } else {
+                    document.getElementById('statusText').innerText = "Wandering Nomad";
+                    document.getElementById('createClanSection').style.display = 'block';
+                }
+            }
         });
-    }
-</script>
+
+        // --- LOAD LAND AREA ---
+        onValue(ref(db, 'territories'), (snap) => {
+            const data = snap.val() || {};
+            let myA = 0;
+            Object.values(data).forEach(t => { if(t.owner === currentUser) myA += (t.areaSize || 0); });
+            document.getElementById('myArea').innerText = Math.round(myA).toLocaleString();
+        });
+
+        // --- CREATE CLAN ---
+        document.getElementById('createBtn').addEventListener('click', async () => {
+            const nameInput = document.getElementById('newClanInput');
+            const name = nameInput.value.trim().toUpperCase();
+            
+            if(!name) return alert("Enter a name!");
+            if(name.length > 15) return alert("Name too long!");
+
+            const snap = await get(child(ref(db), `clans/${name}`));
+            if(snap.exists()) return alert("Clan name already taken!");
+
+            if(!confirm(`Create clan "${name}"? You will become the leader.`)) return;
+
+            await set(ref(db, `clans/${name}`), { 
+                leader: currentUser, 
+                members: { [currentUser]: true }, 
+                created: Date.now() 
+            });
+            await update(ref(db, `users/${currentUser}`), { clan: name });
+            
+            alert(`Empire "${name}" Founded!`);
+            nameInput.value = "";
+        });
+
+        window.logout = function() {
+            if(confirm("Return to main menu?")) {
+                localStorage.clear();
+                window.location.href = 'index.html';
+            }
+        }
+    </script>
 </body>
 </html>
