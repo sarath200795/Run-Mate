@@ -1,31 +1,36 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Land Market - Drag & Drop</title>
+    <title>Land Market</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body { margin: 0; padding: 0; background: #000; font-family: 'Segoe UI', sans-serif; height: 100vh; display: flex; flex-direction: column; }
+        
+        /* HEADER */
         .header { background: #111; padding: 15px; border-bottom: 2px solid #C5A059; text-align: center; color: white; display:flex; justify-content:space-between; align-items:center; }
         .bank-display { color: #FFD700; font-weight: bold; font-size: 1.1rem; border: 1px solid #C5A059; padding: 5px 10px; border-radius: 4px; }
-        
         #map { flex: 1; position: relative; background: #e0e0e0; }
-        
-        .controls { padding: 15px; background: #111; border-top: 1px solid #333; text-align: center; }
-        .btn-claim { background: #C5A059; color: black; border: none; padding: 15px 30px; font-weight: bold; font-family: 'Cinzel', serif; font-size: 1.1rem; border-radius: 4px; cursor: pointer; width: 100%; max-width: 300px; transition: background 0.3s; }
-        .btn-claim:disabled { background: #555; color: #888; cursor: not-allowed; animation: none; }
+
+        /* CONTROLS */
+        .controls { padding: 15px; background: #111; border-top: 1px solid #333; text-align: center; display:flex; gap:10px; justify-content: center; }
+        .btn-claim { flex: 2; background: #C5A059; color: black; border: none; padding: 15px; font-weight: bold; font-family: 'Cinzel', serif; font-size: 1rem; border-radius: 4px; cursor: pointer; }
+        .btn-claim:disabled { background: #555; color: #888; cursor: not-allowed; }
         .btn-claim.confirm { background: #d32f2f; color: white; animation: pulse 1.5s infinite; }
+        
         .btn-back { background: none; border: 1px solid #555; color: #888; padding: 5px 10px; font-size: 0.8rem; cursor: pointer; border-radius: 4px; }
 
-        .legend { position: absolute; bottom: 140px; left: 10px; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 4px; font-size: 0.8rem; color: #ccc; pointer-events: none; z-index: 5; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(211, 47, 47, 0); } 100% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0); } }
+
+        /* LEGEND */
+        .legend { position: absolute; bottom: 20px; left: 10px; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 4px; font-size: 0.8rem; color: #ccc; pointer-events: none; z-index: 5; }
         .legend-item { display: flex; align-items: center; margin-bottom: 5px; }
         .color-box { width: 15px; height: 15px; margin-right: 8px; border: 1px solid #fff; }
-        
-        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(211, 47, 47, 0); } 100% { box-shadow: 0 0 0 0 rgba(211, 47, 47, 0); } }
     </style>
 </head>
 <body>
+
     <div class="header">
         <button class="btn-back" onclick="window.location.href='dashboard.html'">Back</button>
         <div class="bank-display">Banked: <span id="bankVal">0</span> m²</div>
@@ -36,13 +41,12 @@
         <div class="legend">
             <div class="legend-item"><div class="color-box" style="background:#00e676; opacity:0.6;"></div>Your Land</div>
             <div class="legend-item"><div class="color-box" style="background:#2196F3; opacity:0.6;"></div>Ally (Clan)</div>
-            <div class="legend-item"><div class="color-box" style="background:#F44336; opacity:0.6;"></div>Enemy</div>
-            <div class="legend-item"><div class="color-box" style="background:#FFD700; opacity:0.6; border:1px dashed white;"></div>Drag Me</div>
+            <div class="legend-item"><div class="color-box" style="background:#F44336; opacity:0.6;"></div>Enemy Land</div>
+            <div class="legend-item"><div class="color-box" style="background:#FFD700; opacity:0.6;"></div>Drag to Capture</div>
         </div>
     </div>
 
     <div class="controls">
-        <div id="statusText" style="color:#888; font-size:0.9rem; margin-bottom:10px;">Click Preview, then Drag circle to target.</div>
         <button class="btn-claim" id="btnClaim">SPAWN PREVIEW</button>
     </div>
 
@@ -58,8 +62,7 @@
 
         if (!currentUser) window.location.href = 'index.html';
 
-        let map, bankAmount = 0;
-        let myClanId = null;
+        let map, bankAmount = 0, myClanId = null;
         let allPolygons = []; 
         let previewPolygon = null; 
         let previewCoords = null;  
@@ -67,21 +70,19 @@
 
         window.initMap = function() {
             const mapEl = document.getElementById("map");
-            try {
-                map = new google.maps.Map(mapEl, {
-                    zoom: 18, center: { lat: 0, lng: 0 }, mapTypeId: 'roadmap', disableDefaultUI: true,
-                    styles: [{ featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] }]
+            map = new google.maps.Map(mapEl, {
+                zoom: 18, center: { lat: 0, lng: 0 }, mapTypeId: 'roadmap', disableDefaultUI: true,
+                styles: [{ featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] }]
+            });
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(pos => {
+                    map.setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
                 });
+            } else { map.setCenter({ lat: 40.7128, lng: -74.0060 }); }
 
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(pos => {
-                        map.setCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-                    });
-                } else { map.setCenter({ lat: 40.7128, lng: -74.0060 }); }
-
-                loadUserData(); 
-                loadExistingLands();
-            } catch (err) { console.error("Map Error:", err); }
+            loadUserData(); 
+            loadExistingLands();
         };
 
         function loadGoogleMaps() {
@@ -98,36 +99,11 @@
                 const val = snap.val();
                 if(val) {
                     bankAmount = val.bankedArea || 0;
-                    myClanId = val.clanId || null;
+                    myClanId = val.clan || null;
                 }
                 document.getElementById('bankVal').innerText = Math.round(bankAmount);
                 checkButtonState();
             });
-        }
-
-        function checkButtonState() {
-            const btn = document.getElementById('btnClaim');
-            if (bankAmount < 5) {
-                btn.disabled = true; 
-                btn.innerText = "Insufficient Banked Area";
-                btn.classList.remove('confirm');
-            } else if (!isPreviewMode) {
-                btn.disabled = false; 
-                btn.style.background = "#C5A059"; 
-                btn.innerText = "SPAWN PREVIEW";
-                btn.classList.remove('confirm');
-            }
-        }
-
-        function resetPreview() {
-            if (previewPolygon) {
-                previewPolygon.setMap(null);
-                previewPolygon = null;
-            }
-            previewCoords = null;
-            isPreviewMode = false;
-            document.getElementById('statusText').innerText = "Click Preview, then Drag circle to target.";
-            checkButtonState();
         }
 
         function loadExistingLands() {
@@ -156,187 +132,198 @@
 
                         const tCoords = t.coords.map(c => [c.lng, c.lat]);
                         if (tCoords.length > 0 && (tCoords[0][0] !== tCoords[tCoords.length-1][0] || tCoords[0][1] !== tCoords[tCoords.length-1][1])) {
-                            tCoords.push(tCoords[0]);
+                            tCoords.push(tCoords[0]); 
                         }
-                        
                         let turfPoly = turf.polygon([tCoords]);
                         turfPoly = turf.rewind(turfPoly);
 
-                        allPolygons.push({ 
-                            id: key, 
-                            owner: t.owner, 
-                            clan: t.clanId || null,
-                            turfPoly: turfPoly, 
-                            googlePoly: poly
-                        });
+                        allPolygons.push({ id: key, owner: t.owner, clan: t.clanId, turfPoly: turfPoly, googlePoly: poly });
                     });
                 }
             });
         }
 
-        // --- VALIDATION LOGIC ---
+        function checkButtonState() {
+            const btn = document.getElementById('btnClaim');
+            if (bankAmount < 5) {
+                btn.disabled = true; 
+                btn.innerText = "Insufficient Area";
+                btn.classList.remove('confirm');
+            } else if (!isPreviewMode) {
+                btn.disabled = false; 
+                btn.style.background = "#C5A059"; 
+                btn.innerText = "SPAWN PREVIEW";
+                btn.classList.remove('confirm');
+            }
+        }
+
         function validatePlacement(currentCoords) {
-            // Convert Google Coords to Turf Poly
             const turfCoords = currentCoords.map(c => [c.lng, c.lat]);
             turfCoords.push([currentCoords[0].lng, currentCoords[0].lat]); 
             const newPoly = turf.polygon([turfCoords]);
 
-            let touchesEnemy = false;
-            let isValid = true;
-            let msg = "Valid Location";
+            let touchesEnemy = false, isValid = true;
 
             for(const existing of allPolygons) {
                 if (turf.booleanIntersects(newPoly, existing.turfPoly)) { 
-                    
-                    if (existing.owner === currentUser) {
-                        isValid = false; msg = "Cannot overlap SELF"; break;
-                    }
-                    if (myClanId && existing.clan === myClanId) {
-                        isValid = false; msg = "Cannot overlap ALLY"; break;
-                    }
+                    if (existing.owner === currentUser) { isValid = false; break; }
+                    if (myClanId && existing.clan === myClanId) { isValid = false; break; }
                     touchesEnemy = true;
                 }
             }
-
-            return { isValid, touchesEnemy, msg };
+            return { isValid, touchesEnemy };
         }
 
-        // --- BUTTON HANDLER ---
+        // --- CONSISTENCY POINT LOGIC (Same as Game.html) ---
+        function calculateNewPoints(streakDay) {
+            if (streakDay === 1) return 1;
+            if (streakDay === 2) return 2;
+            if (streakDay === 3) return 4;
+            if (streakDay === 4) return 6;
+            if (streakDay === 5) return 5;
+            if (streakDay >= 6 && streakDay <= 21) return 2;
+            if (streakDay >= 22 && streakDay <= 90) return 3;
+            if (streakDay >= 91 && streakDay <= 365) return 3;
+            if (streakDay > 365) return 3; 
+            return 1; 
+        }
+
         document.getElementById('btnClaim').addEventListener('click', async () => {
             if(bankAmount < 5) return;
             const btn = document.getElementById('btnClaim');
-            const statusTxt = document.getElementById('statusText');
 
-            // --- STEP 1: SPAWN DRAGGABLE PREVIEW ---
+            // 1. SPAWN MODE
             if (!isPreviewMode) {
                 const center = map.getCenter();
                 const radiusMeters = Math.sqrt(bankAmount / Math.PI);
-                
                 previewCoords = generateCircleCoords(center.lat(), center.lng(), radiusMeters);
                 
-                // CREATE DRAGGABLE POLYGON
                 previewPolygon = new google.maps.Polygon({
-                    paths: previewCoords,
-                    fillColor: "#FFD700",
-                    fillOpacity: 0.6,
-                    strokeColor: "#FFD700",
-                    strokeWeight: 2,
-                    draggable: true, // <--- ENABLE DRAGGING
-                    geodesic: true,
-                    map: map,
-                    zIndex: 100
+                    paths: previewCoords, fillColor: "#FFD700", fillOpacity: 0.6, strokeColor: "#FFD700", strokeWeight: 2,
+                    draggable: true, map: map, zIndex: 100
                 });
 
-                // Attach Drag Listener
                 google.maps.event.addListener(previewPolygon, 'dragend', function() {
-                    // 1. Get new coords
-                    const rawPath = this.getPath().getArray();
-                    const newCoords = rawPath.map(p => ({ lat: p.lat(), lng: p.lng() }));
+                    const newCoords = this.getPath().getArray().map(p => ({ lat: p.lat(), lng: p.lng() }));
                     previewCoords = newCoords;
-
-                    // 2. Validate Position
                     const check = validatePlacement(newCoords);
 
-                    // 3. Update UI based on Validity
                     if(!check.isValid) {
-                        this.setOptions({ fillColor: "#d32f2f", strokeColor: "#d32f2f" }); // Red
-                        btn.disabled = true;
-                        btn.innerText = "INVALID POSITION";
-                        btn.classList.remove('confirm');
-                        statusTxt.innerText = `⚠️ ${check.msg}`;
+                        this.setOptions({ fillColor: "#d32f2f" }); 
+                        btn.disabled = true; btn.innerText = "INVALID OVERLAP"; btn.classList.remove('confirm');
                     } else {
-                        this.setOptions({ fillColor: "#FFD700", strokeColor: "#FFD700" }); // Gold
-                        btn.disabled = false;
+                        this.setOptions({ fillColor: "#FFD700" }); 
+                        btn.disabled = false; 
                         if(check.touchesEnemy) {
-                            btn.innerText = "ATTACK & CLAIM";
-                            btn.classList.add('confirm');
-                            statusTxt.innerText = "⚔️ Targeting Enemy! Ready to attack.";
+                            btn.innerText = "ATTACK & CLAIM"; btn.classList.add('confirm');
                         } else {
-                            btn.innerText = "CONFIRM CLAIM";
-                            btn.classList.remove('confirm');
-                            statusTxt.innerText = "✅ Valid location. Ready to claim.";
+                            btn.innerText = "CONFIRM CLAIM"; btn.classList.remove('confirm');
                         }
                     }
                 });
-
-                // Run initial validation immediately on spawn
+                
                 google.maps.event.trigger(previewPolygon, 'dragend');
-
                 isPreviewMode = true;
                 return;
             }
 
-            // --- STEP 2: CONFIRMATION ---
+            // 2. CONFIRM MODE
             if (isPreviewMode && previewCoords) {
-                // Check validation one last time before submitting
-                const finalCheck = validatePlacement(previewCoords);
-                if(!finalCheck.isValid) {
-                    alert("Invalid placement! Please move the selection to a valid area.");
-                    return;
-                }
-
                 if(!confirm(`Finalize capture of ${Math.round(bankAmount)} m²?`)) return;
 
                 const updates = {};
                 const newKey = push(ref(db, 'territories')).key;
                 
-                // Turf Math for Cuts
+                // Territory Data
+                updates[`territories/${newKey}`] = { 
+                    owner: currentUser, clanId: myClanId || null, coords: previewCoords, areaSize: bankAmount, timestamp: Date.now(), source: 'Market' 
+                };
+                
+                // Deduct Bank
+                updates[`users/${currentUser}/bankedArea`] = 0; 
+
+                // --- STREAK & POINTS LOGIC (UPDATED) ---
+                const userRef = ref(db, `users/${currentUser}`);
+                const userSnap = await get(userRef);
+                const userData = userSnap.val();
+                
+                const currentPoints = userData.creditPoints || 0;
+                const currentStreak = userData.streak || 0;
+                const lastDateVal = userData.lastActiveDate || 0;
+                
+                let pointMsg = "";
+                let pointsToAdd = 0;
+                let newStreak = currentStreak;
+
+                // Only reward points if Area > 1000m² (Consistency Check)
+                if (bankAmount >= 1000) {
+                    const now = new Date();
+                    const todayStr = now.toDateString();
+                    const lastDate = lastDateVal ? new Date(lastDateVal) : null;
+
+                    if (!lastDate || lastDate.toDateString() !== todayStr) {
+                         // Check consecutive days
+                         if (lastDate) { 
+                            const oneDay = 24 * 60 * 60 * 1000; 
+                            const diffDays = Math.round(Math.abs((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(lastDate.getFullYear(), lastDate.getMonth(), lastDate.getDate())) / oneDay)); 
+                            if (diffDays === 1) newStreak = currentStreak + 1;
+                            else newStreak = 1; // Reset if missed a day
+                        } else {
+                            newStreak = 1; // First day ever
+                        }
+                        
+                        pointsToAdd = calculateNewPoints(newStreak);
+                        pointMsg = `\n+${pointsToAdd} Credit Points! (Streak: ${newStreak})`;
+                        
+                        updates[`users/${currentUser}/streak`] = newStreak;
+                        updates[`users/${currentUser}/lastActiveDate`] = Date.now();
+                        updates[`users/${currentUser}/creditPoints`] = currentPoints + pointsToAdd;
+                    } else {
+                        pointMsg = "\n(Daily streak points already claimed)";
+                    }
+                }
+                
+                // Process Enemies (Cutting Logic) - NO BONUS POINTS HERE NOW
                 const myTurfCoords = previewCoords.map(c => [c.lng, c.lat]);
                 myTurfCoords.push(myTurfCoords[0]);
                 const myTurfPoly = turf.polygon([myTurfCoords]);
 
-                updates[`territories/${newKey}`] = { 
-                    owner: currentUser, 
-                    clanId: myClanId || null,
-                    coords: previewCoords, 
-                    areaSize: bankAmount, 
-                    timestamp: Date.now(), 
-                    source: 'Market' 
-                };
-
-                updates[`users/${currentUser}/bankedArea`] = 0; 
-
-                let enemiesHit = 0;
-
-                // Cut Logic
                 allPolygons.forEach(target => {
                     if (turf.booleanIntersects(myTurfPoly, target.turfPoly)) {
                         const diff = turf.difference(target.turfPoly, myTurfPoly);
-
                         if (!diff) {
                             updates[`territories/${target.id}`] = null; 
-                            enemiesHit++;
                         } else {
-                            const geometryType = diff.geometry.type;
-                            if (geometryType === 'Polygon') {
-                                const newCoords = diff.geometry.coordinates[0].map(pt => ({ lat: pt[1], lng: pt[0] }));
-                                newCoords.pop(); 
-                                updates[`territories/${target.id}/coords`] = newCoords;
-                                enemiesHit++;
-                            } else if (geometryType === 'MultiPolygon') {
-                                const newCoords = diff.geometry.coordinates[0][0].map(pt => ({ lat: pt[1], lng: pt[0] }));
-                                newCoords.pop();
-                                updates[`territories/${target.id}/coords`] = newCoords;
-                                enemiesHit++;
+                            const type = diff.geometry.type;
+                            let newC = [];
+                            if (type === 'Polygon') newC = diff.geometry.coordinates[0];
+                            else if (type === 'MultiPolygon') newC = diff.geometry.coordinates[0][0];
+                            
+                            if(newC.length > 0) {
+                                const formatted = newC.map(pt => ({ lat: pt[1], lng: pt[0] }));
+                                formatted.pop(); 
+                                updates[`territories/${target.id}/coords`] = formatted;
                             }
                         }
                     }
                 });
 
-                const userSnap = await get(ref(db, `users/${currentUser}`));
-                const currentPoints = userSnap.val().creditPoints || 0;
-                updates[`users/${currentUser}/creditPoints`] = currentPoints + 10 + (enemiesHit * 50);
-
-                try { 
+                try {
                     await update(ref(db), updates); 
-                    resetPreview(); 
-                    alert(enemiesHit > 0 ? "⚔️ Victory! Enemy territory captured." : "Territory Claimed Successfully!"); 
-                    window.location.href = 'dashboard.html'; 
-                } catch(e) { 
-                    alert("Error: " + e.message); 
+                    alert(`Market Purchase Complete!${pointMsg}`);
+                    resetPreview();
+                    window.location.href = 'dashboard.html';
+                } catch(e) {
+                    alert("Error: " + e.message);
                 }
             }
         });
+
+        function resetPreview() {
+            if (previewPolygon) { previewPolygon.setMap(null); previewPolygon = null; }
+            previewCoords = null; isPreviewMode = false;
+            checkButtonState();
+        }
 
         function generateCircleCoords(lat, lng, radius) {
             const points = 32; const coords = [];
