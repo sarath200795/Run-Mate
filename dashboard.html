@@ -33,42 +33,32 @@
             align-items: center;
         }
 
-        /* FIX: Container for the icon/image */
         .user-icon-container {
-            width: 80px; 
-            height: 80px; 
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 3rem; /* For Emojis */
+            width: 80px; height: 80px; margin-bottom: 15px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 3rem;
         }
         
-        /* FIX: Style for the Image tag if used */
         .profile-img {
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            border: 2px solid #C5A059;
-            object-fit: cover;
+            width: 100%; height: 100%; border-radius: 50%;
+            border: 2px solid #C5A059; object-fit: cover;
         }
         
         .user-name { 
-            font-family: 'Cinzel', serif; 
-            font-size: 1.8rem; 
-            color: #C5A059;
-            margin: 0;
-            white-space: nowrap; 
-            overflow: hidden; 
-            text-overflow: ellipsis; 
-            max-width: 100%;
-            display: block;
+            font-family: 'Cinzel', serif; font-size: 1.8rem; color: #C5A059;
+            margin: 0; white-space: nowrap; overflow: hidden; 
+            text-overflow: ellipsis; max-width: 100%; display: block;
         }
 
         .clan-tag { color: #888; font-size: 0.9rem; letter-spacing: 1px; margin-top: 5px; }
 
-        /* --- STAT GRID --- */
-        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        /* --- STAT GRID (Auto-Adjusts columns) --- */
+        .stats-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); 
+            gap: 10px; 
+        }
+        
         .stat-card { 
             background: #222; padding: 15px; border-radius: 8px; text-align: center; 
             border: 1px solid #444; 
@@ -90,6 +80,8 @@
         .btn-start { background: linear-gradient(135deg, #006400 0%, #004d00 100%); border: 1px solid #00e676; grid-column: span 2; }
         .btn-market { background: #333; border: 1px solid #C5A059; color: #C5A059; }
         .btn-social { background: #222; border: 1px solid #444; }
+        .btn-clan   { background: #1a0b0b; border: 1px solid #8B0000; color: #ff6666; }
+        
         .btn-logout { background: #220000; border: 1px solid #ff4444; color: #ff8888; margin-top: 20px; width: 100%; padding: 15px; border-radius: 8px; cursor: pointer; }
 
         /* --- CLAN CREATE SECTION --- */
@@ -103,7 +95,6 @@
     <div class="container">
         <div class="profile-header">
             <div class="user-icon-container" id="dIcon"></div>
-            
             <div class="user-name" id="dName">Loading...</div>
             <div class="clan-tag" id="statusText">...</div>
         </div>
@@ -111,8 +102,14 @@
         <div class="stats-grid">
             <div class="stat-card">
                 <span class="stat-val" id="myArea">0</span>
-                <span class="stat-lbl">Land Controlled (m²)</span>
+                <span class="stat-lbl">Personal Land</span>
             </div>
+            
+            <div class="stat-card" id="clanStatBox" style="display:none;">
+                <span class="stat-val" id="clanArea" style="color:#ff4444">0</span>
+                <span class="stat-lbl">Clan Empire</span>
+            </div>
+
             <div class="stat-card">
                 <span class="stat-val" id="myPoints" style="color:#FFD700">0</span>
                 <span class="stat-lbl">Credit Points</span>
@@ -136,6 +133,10 @@
                 <span>🗺️ MY LANDS</span>
             </button>
             
+            <button class="action-btn btn-clan" onclick="window.location.href='clan_land.html'">
+                <span>🏴 CLAN LANDS</span>
+            </button>
+
             <button class="action-btn btn-social" onclick="window.location.href='clan_manage.html'">
                 <span>🏰 CLAN HALL</span>
             </button>
@@ -167,45 +168,84 @@
 
         document.getElementById('dName').innerText = currentUser;
         
+        // Globals for calculation
+        let myClanId = null;
+        let clanMembers = {};
+        let allTerritories = {};
+
         // --- LOAD USER DATA ---
         onValue(ref(db, `users/${currentUser}`), (snap) => {
             const data = snap.val();
             if (data) {
-                // 1. Handle Display Name
+                // Name & Icon
                 const displayName = data.displayName || currentUser;
                 document.getElementById('dName').innerText = displayName;
-                
-                // 2. Handle Icon (Logic Fix)
                 const iconData = data.icon || "👤";
                 const iconContainer = document.getElementById('dIcon');
                 
-                // Check if the icon string is a URL (starts with http)
                 if (iconData.startsWith('http')) {
                     iconContainer.innerHTML = `<img src="${iconData}" class="profile-img" alt="Profile">`;
                 } else {
-                    iconContainer.innerHTML = iconData; // It's an emoji
+                    iconContainer.innerHTML = iconData;
                 }
 
-                // 3. Stats & Clan
+                // Points
                 document.getElementById('myPoints').innerText = data.creditPoints || 0;
                 
+                // Clan Logic
                 if (data.clan) {
+                    myClanId = data.clan;
                     document.getElementById('statusText').innerText = `Member of [${data.clan}]`;
                     document.getElementById('createClanSection').style.display = 'none';
+                    document.getElementById('clanStatBox').style.display = 'block';
+                    
+                    // Fetch Clan Members for calculation
+                    loadClanMembers(myClanId);
                 } else {
                     document.getElementById('statusText').innerText = "Wandering Nomad";
                     document.getElementById('createClanSection').style.display = 'block';
+                    document.getElementById('clanStatBox').style.display = 'none';
                 }
             }
         });
 
+        function loadClanMembers(clanId) {
+            get(child(ref(db), `clans/${clanId}/members`)).then(snap => {
+                clanMembers = snap.val() || {};
+                calculateStats(); // Recalculate once we have members
+            });
+        }
+
         // --- LOAD LAND AREA ---
         onValue(ref(db, 'territories'), (snap) => {
-            const data = snap.val() || {};
-            let myA = 0;
-            Object.values(data).forEach(t => { if(t.owner === currentUser) myA += (t.areaSize || 0); });
-            document.getElementById('myArea').innerText = Math.round(myA).toLocaleString();
+            allTerritories = snap.val() || {};
+            calculateStats();
         });
+
+        function calculateStats() {
+            let myArea = 0;
+            let clanTotalArea = 0;
+
+            Object.values(allTerritories).forEach(t => {
+                const size = parseFloat(t.areaSize || 0);
+                
+                // Personal
+                if(t.owner === currentUser) {
+                    myArea += size;
+                }
+
+                // Clan (If owner is in my clan list)
+                if (myClanId && t.owner && clanMembers[t.owner]) {
+                    clanTotalArea += size;
+                }
+            });
+
+            document.getElementById('myArea').innerText = Math.round(myArea).toLocaleString();
+            
+            if (myClanId) {
+                document.getElementById('clanArea').innerText = Math.round(clanTotalArea).toLocaleString();
+            }
+        }
 
         // --- CREATE CLAN ---
         document.getElementById('createBtn').addEventListener('click', async () => {
