@@ -47,6 +47,12 @@
 
         .signup-link { margin-top: 25px; display: block; color: #888; text-decoration: none; font-size: 0.9rem; }
         .signup-link span { color: #C5A059; font-weight: bold; text-decoration: underline; }
+        
+        /* --- NEW PRIVACY LINK STYLE --- */
+        .privacy-link {
+            display: block; margin-top: 15px; font-size: 0.75rem; color: #555; text-decoration: none;
+        }
+        .privacy-link:hover { color: #888; text-decoration: underline; }
 
         /* --- USERNAME MODAL STYLES --- */
         .modal {
@@ -75,6 +81,8 @@
         </button>
 
         <a href="signup.html" class="signup-link">New Conqueror? <span>Recruit Here</span></a>
+        
+        <a href="privacy.html" class="privacy-link">Privacy Policy</a>
     </div>
 
     <div id="usernameModal" class="modal">
@@ -118,9 +126,6 @@
 
             try {
                 // For manual login, we assume the 'key' in users/ path is the username
-                // Or you might be using a separate Auth UID. 
-                // Based on your previous code, you were using direct paths.
-                // NOTE: This assumes manual signup created a path `users/${userIn}`
                 const snapshot = await get(child(ref(db), `users/${userIn}`));
                 
                 if (snapshot.exists() && snapshot.val().password === passIn) {
@@ -168,7 +173,6 @@
             btn.disabled = true;
 
             // CHECK IF USERNAME IS TAKEN
-            // We query the 'users' path to see if any 'displayName' matches
             const q = query(ref(db, 'users'), orderByChild('displayName'), equalTo(desiredName));
             const nameSnap = await get(q);
 
