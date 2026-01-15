@@ -1,14 +1,27 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Conquest Map - Fitness & Profile</title>
+    <title>Conquest Live Tracker</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <style>
         html, body { height: 100%; margin: 0; padding: 0; background: #000; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
         #map { height: 100%; width: 100%; }
         
+        /* LIVE HUD STYLES */
+        #liveHUD {
+            display: none; position: absolute; top: 70px; left: 50%; transform: translateX(-50%);
+            width: 95%; max-width: 500px; background: rgba(0, 0, 0, 0.85);
+            border: 1px solid #00e676; border-radius: 12px; z-index: 450;
+            padding: 10px; grid-template-columns: repeat(3, 1fr); gap: 10px;
+            box-shadow: 0 0 20px rgba(0, 230, 118, 0.3); font-family: 'Orbitron', sans-serif;
+        }
+        .hud-item { text-align: center; border-right: 1px solid #333; }
+        .hud-item:last-child { border-right: none; }
+        .hud-val { display: block; color: #00e676; font-size: 1.1rem; font-weight: bold; }
+        .hud-lbl { display: block; color: #888; font-size: 0.6rem; text-transform: uppercase; }
+
         /* INDOOR INTERFACE */
         #indoorInterface {
             display: none; height: 100%; width: 100%;
@@ -16,77 +29,33 @@
             flex-direction: column; align-items: center; justify-content: center;
             color: white; position: absolute; top: 0; left: 0; z-index: 50;
         }
-        .metric-circle {
-            width: 180px; height: 180px; border-radius: 50%; border: 5px solid #00e676;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            margin-bottom: 20px; box-shadow: 0 0 30px rgba(0, 230, 118, 0.2);
-            animation: pulse 2s infinite;
-        }
-        @keyframes pulse { 0% { box-shadow: 0 0 10px rgba(0,230,118,0.1); } 50% { box-shadow: 0 0 30px rgba(0,230,118,0.4); } 100% { box-shadow: 0 0 10px rgba(0,230,118,0.1); } }
         
-        .metric-val { font-size: 2.2rem; font-weight: bold; font-family: 'Cinzel', serif; }
-        .metric-label { color: #888; font-size: 0.8rem; text-transform: uppercase; }
-
-        .fitness-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; width: 90%; max-width: 300px; margin-bottom: 20px; }
-        .fit-card { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 12px; text-align: center; border: 1px solid #333; }
-        .fit-num { display: block; font-size: 1.5rem; color: #00e676; font-weight: bold; }
-
         /* SIDEBAR & UI */
         .sidebar { position: absolute; top: 0; left: 0; bottom: 0; width: 260px; background: rgba(15,15,15,0.98); border-right: 2px solid #8B0000; z-index: 400; transform: translateX(-100%); transition: 0.3s; color: white; display:flex; flex-direction:column; }
         .sidebar.open { transform: translateX(0); }
         .menu-toggle { position: absolute; top: 10px; left: 10px; z-index: 401; background: #8B0000; color: white; padding: 8px 12px; border-radius: 4px; cursor: pointer; border: 2px solid #ff4444; font-family: 'Cinzel', serif; }
         
-        .mode-switch-container { position: absolute; top: 10px; right: 10px; z-index: 401; background: rgba(0,0,0,0.8); padding: 5px; border-radius: 20px; border: 1px solid #C5A059; display: flex; }
-        .mode-btn { padding: 8px 12px; border-radius: 15px; border: none; cursor: pointer; font-weight: bold; color: #aaa; background: none; font-size: 0.75rem; }
-        .mode-btn.active { background: #C5A059; color: black; }
-
         .controls { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 400px; z-index: 300; display: flex; flex-direction: column; gap: 10px; }
-        button { padding: 15px; border: none; border-radius: 12px; font-size: 1rem; font-weight: bold; cursor: pointer; font-family: 'Cinzel', serif; text-transform: uppercase; }
+        button, .nav-btn { padding: 15px; border: none; border-radius: 12px; font-size: 1rem; font-weight: bold; cursor: pointer; font-family: 'Cinzel', serif; text-transform: uppercase; text-decoration: none; text-align: center; flex: 1; }
         #startBtn { background: linear-gradient(180deg, #00e676, #00c853); color: #003300; }
         #stopBtn { background: linear-gradient(180deg, #ff1744, #d50000); color: white; display: none; }
+        .home-btn { background: #fff; color: #000; }
 
         .modal { display: none; position: fixed; z-index: 999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); align-items: center; justify-content: center; }
         .modal-content { background: #1a1a1a; padding: 25px; border: 2px solid #C5A059; border-radius: 8px; width: 85%; max-width: 350px; color: white; }
-        .modal h2 { color: #C5A059; font-family: 'Cinzel', serif; margin-top: 0; }
-        input[type=number], input[type=range], input[type=text] { width: 100%; padding: 10px; margin: 10px 0; background: #222; border: 1px solid #444; color: white; border-radius: 4px; box-sizing: border-box; }
     </style>
 </head>
 <body>
 
     <div class="menu-toggle" id="menuBtn">☰ STATS</div>
 
-    <div class="mode-switch-container">
-        <button class="mode-btn active" id="btnModeOut" onclick="window.setMode('outdoor')">🏹 OUTDOOR</button>
-        <button class="mode-btn" id="btnModeIn" onclick="window.setMode('indoor')">🏃 INDOOR</button>
-    </div>
-
-    <div id="indoorInterface">
-        <h2 style="color:#C5A059; font-family:'Cinzel', serif;">TRAINING MODE</h2>
-        <div class="metric-circle">
-            <div class="metric-val" id="indDistLarge">0</div>
-            <div class="metric-label">METERS</div>
-        </div>
-        <div class="fitness-grid">
-            <div class="fit-card"><span class="fit-num" id="indSteps">0</span><span class="metric-label">Steps</span></div>
-            <div class="fit-card"><span class="fit-num" id="indCal">0</span><span class="metric-label">Kcal</span></div>
-        </div>
-    </div>
-
-    <div class="sidebar" id="sidebar">
-        <div style="padding:20px; text-align:center; border-bottom:1px solid #333;">
-            <div id="sbUser" style="font-size:1.2rem; font-weight:bold;">...</div>
-            <button onclick="document.getElementById('profileModal').style.display='flex'" style="background:none; color:#C5A059; border:1px solid #C5A059; padding:5px 10px; margin-top:10px; font-size:0.7rem; cursor:pointer;">EDIT PROFILE</button>
-        </div>
-        <div style="padding:20px;">
-            <div class="metric-label">Lifetime Fitness</div>
-            <div style="display:flex; justify-content:space-between; margin-top:10px;">
-                <span>Total Steps:</span><span id="sbTotalSteps" style="color:#00e676">0</span>
-            </div>
-            <div style="display:flex; justify-content:space-between;">
-                <span>Total Cal:</span><span id="sbTotalCal" style="color:#ff1744">0</span>
-            </div>
-        </div>
-        <button onclick="window.logout()" style="margin-top:auto; background:#333; color:white; border:none; padding:15px; cursor:pointer;">LOGOUT</button>
+    <div id="liveHUD">
+        <div class="hud-item"><span class="hud-val" id="hudTime">00:00</span><span class="hud-lbl">Time</span></div>
+        <div class="hud-item"><span class="hud-val" id="hudDist">0m</span><span class="hud-lbl">Dist</span></div>
+        <div class="hud-item"><span class="hud-val" id="hudSteps">0</span><span class="hud-lbl">Steps</span></div>
+        <div class="hud-item"><span class="hud-val" id="hudSpeed">0.0</span><span class="hud-lbl">Km/h</span></div>
+        <div class="hud-item"><span class="hud-val" id="hudPace">0'00"</span><span class="hud-lbl">Pace</span></div>
+        <div class="hud-item"><span class="hud-val" id="hudCal">0</span><span class="hud-lbl">Kcal</span></div>
     </div>
 
     <div id="map"></div>
@@ -94,19 +63,8 @@
     <div class="controls">
         <button id="startBtn">⚔️ Start Conquest</button>
         <button id="stopBtn">🚩 Claim Territory</button>
-    </div>
-
-    <div id="profileModal" class="modal">
-        <div class="modal-content">
-            <h2>👤 Recruit Profile</h2>
-            <label>Icon URL or Emoji</label>
-            <input type="text" id="profIcon" placeholder="https://... or 🛡️">
-            <label>Weight (kg)</label>
-            <input type="number" id="profWeight" value="75">
-            <label>Step Sensitivity</label>
-            <input type="range" id="profSense" min="8" max="25" value="15">
-            <button class="mode-btn active" style="width:100%; padding:15px; margin-top:10px;" onclick="saveProfile()">SAVE RECORD</button>
-            <button class="mode-btn" style="width:100%; margin-top:5px; color:#888;" onclick="document.getElementById('profileModal').style.display='none'">CANCEL</button>
+        <div id="conquestNav" style="display: flex; gap: 10px; width: 100%;">
+            <a href="dashboard.html" class="nav-btn home-btn">🏰 HOME</a>
         </div>
     </div>
 
@@ -118,128 +76,105 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        let map, userMarker, activePolyline, watchId, pathCoords = [];
-        let gameMode = 'outdoor';
-        let stepCount = 0, indoorDistance = 0, lastIndoorPos = null, isTracking = false;
+        let map, userMarker, activePolyline, watchId, timerInterval;
+        let isTracking = false, startTime, totalMeters = 0;
+        let stepCount = 0, lastAccelZ = 0, lastPos = null;
         
         const currentUser = localStorage.getItem('currentUser');
-        if(!currentUser) window.location.href = 'index.html';
-
         let userWeight = parseInt(localStorage.getItem('userWeight')) || 75;
         let stepThreshold = parseInt(localStorage.getItem('stepSense')) || 15;
-        let lastAccelZ = 0;
 
         window.initMap = function() {
             map = new google.maps.Map(document.getElementById("map"), {
                 zoom: 19, center: { lat: 0, lng: 0 }, mapTypeId: 'terrain', disableDefaultUI: true,
                 styles: [{elementType: 'geometry', stylers: [{color: '#242f3e'}]}]
             });
-            
-            if (navigator.geolocation) {
-                navigator.geolocation.watchPosition(pos => {
-                    const latLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                    updateUserMarker(latLng);
-                });
-            }
+            navigator.geolocation.getCurrentPosition(p => {
+                const pos = { lat: p.coords.latitude, lng: p.coords.longitude };
+                updateUserMarker(pos);
+                map.setCenter(pos);
+            });
         };
 
-        // --- UPDATED: Fix for Pin Name vs Image URL ---
         function updateUserMarker(pos) {
             const iconData = localStorage.getItem('userIcon') || "👤";
             const isUrl = iconData.startsWith('http');
-
             if (!userMarker) {
                 userMarker = new google.maps.Marker({
-                    position: pos,
-                    map: map,
+                    position: pos, map,
                     icon: isUrl ? { url: iconData, scaledSize: new google.maps.Size(42, 42) } : null,
-                    label: !isUrl ? { text: iconData, fontSize: "24px" } : null,
-                    title: currentUser
+                    label: !isUrl ? { text: iconData, fontSize: "24px" } : null
                 });
-                map.setCenter(pos);
-            } else {
-                userMarker.setPosition(pos);
-                // Update icon if it changed in profile
-                if(isUrl) {
-                    userMarker.setIcon({ url: iconData, scaledSize: new google.maps.Size(42, 42) });
-                    userMarker.setLabel(null);
-                } else {
-                    userMarker.setIcon(null);
-                    userMarker.setLabel({ text: iconData, fontSize: "24px" });
-                }
-            }
+            } else { userMarker.setPosition(pos); }
         }
 
-        // --- FITNESS & MOTION ---
         function handleMotion(event) {
             if (!isTracking) return;
             const acc = event.accelerationIncludingGravity;
-            if(!acc) return;
-            let currentAccelZ = acc.z;
-            let delta = Math.abs(currentAccelZ - lastAccelZ);
-
-            if (delta > stepThreshold) {
-                stepCount++;
-                updateFitnessDisplay();
-            }
-            lastAccelZ = currentAccelZ;
+            let delta = Math.abs(acc.z - lastAccelZ);
+            if (delta > stepThreshold) { stepCount++; }
+            lastAccelZ = acc.z;
         }
 
-        function updateFitnessDisplay() {
-            const dist = (gameMode === 'indoor') ? indoorDistance : google.maps.geometry.spherical.computeLength(pathCoords);
-            const calories = (dist / 1000) * userWeight * 1.03;
+        function updateLiveStats(currentPos) {
+            if (lastPos) {
+                const d = google.maps.geometry.spherical.computeDistanceBetween(
+                    new google.maps.LatLng(lastPos), new google.maps.LatLng(currentPos)
+                );
+                if (d > 1) totalMeters += d;
+            }
+            lastPos = currentPos;
 
-            if (gameMode === 'indoor') {
-                document.getElementById('indSteps').innerText = stepCount;
-                document.getElementById('indCal').innerText = Math.round(calories);
-                document.getElementById('indDistLarge').innerText = Math.round(dist);
+            const elapsedSec = Math.floor((Date.now() - startTime) / 1000);
+            const km = totalMeters / 1000;
+            
+            // Live Calculations
+            const speed = (km / (elapsedSec / 3600)) || 0;
+            const paceMin = (elapsedSec / 60) / km;
+            const calories = km * userWeight * 1.03;
+
+            // Update UI
+            document.getElementById('hudTime').innerText = new Date(elapsedSec * 1000).toISOString().substr(14, 5);
+            document.getElementById('hudDist').innerText = totalMeters > 1000 ? km.toFixed(2) + 'km' : Math.round(totalMeters) + 'm';
+            document.getElementById('hudSteps').innerText = stepCount;
+            document.getElementById('hudSpeed').innerText = speed.toFixed(1);
+            document.getElementById('hudCal').innerText = Math.round(calories);
+
+            if (km > 0.01) {
+                const pMin = Math.floor(paceMin);
+                const pSec = Math.floor((paceMin - pMin) * 60);
+                document.getElementById('hudPace').innerText = `${pMin}'${pSec.toString().padStart(2, '0')}"`;
             }
         }
 
-        // --- BUTTONS ---
         document.getElementById('startBtn').addEventListener('click', async () => {
-            if (typeof DeviceMotionEvent.requestPermission === 'function') {
-                const permission = await DeviceMotionEvent.requestPermission();
-                if (permission !== 'granted') return alert("Motion Access Required");
-            }
-
+            if (typeof DeviceMotionEvent.requestPermission === 'function') await DeviceMotionEvent.requestPermission();
+            
             isTracking = true;
-            stepCount = 0; indoorDistance = 0; pathCoords = [];
-            window.addEventListener('devicemotion', handleMotion);
+            startTime = Date.now();
+            totalMeters = 0; stepCount = 0; lastPos = null;
+            
+            document.getElementById('liveHUD').style.display = 'grid';
             document.getElementById('startBtn').style.display = 'none';
+            document.getElementById('conquestNav').style.display = 'none';
             document.getElementById('stopBtn').style.display = 'block';
 
-            if (gameMode === 'outdoor') {
-                activePolyline = new google.maps.Polyline({ strokeColor: '#FFFF00', strokeWeight: 5, map });
-                watchId = navigator.geolocation.watchPosition(pos => {
-                    const pt = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                    pathCoords.push(pt);
-                    activePolyline.getPath().push(new google.maps.LatLng(pt.lat, pt.lng));
-                    updateFitnessDisplay();
-                }, null, { enableHighAccuracy: true });
-            } else {
-                watchId = navigator.geolocation.watchPosition(pos => {
-                    const pt = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                    if(lastIndoorPos) {
-                        const d = google.maps.geometry.spherical.computeDistanceBetween(
-                            new google.maps.LatLng(lastIndoorPos), new google.maps.LatLng(pt)
-                        );
-                        if(d > 1 && d < 25) indoorDistance += d;
-                    }
-                    lastIndoorPos = pt;
-                    updateFitnessDisplay();
-                });
-            }
+            window.addEventListener('devicemotion', handleMotion);
+            
+            watchId = navigator.geolocation.watchPosition(pos => {
+                const pt = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                updateLiveStats(pt);
+                updateUserMarker(pt);
+                map.panTo(pt);
+            }, null, { enableHighAccuracy: true });
         });
 
         document.getElementById('stopBtn').addEventListener('click', async () => {
             isTracking = false;
             window.removeEventListener('devicemotion', handleMotion);
             navigator.geolocation.clearWatch(watchId);
-
-            const finalDist = (gameMode === 'indoor') ? indoorDistance : google.maps.geometry.spherical.computeLength(pathCoords);
-            const finalCal = (finalDist / 1000) * userWeight * 1.03;
-
+            
+            const finalCal = (totalMeters / 1000) * userWeight * 1.03;
             const snap = await get(ref(db, `users/${currentUser}`));
             const userData = snap.val() || {};
 
@@ -248,43 +183,10 @@
                 totalCalories: (userData.totalCalories || 0) + finalCal
             });
 
-            alert(`Session Complete!\nSteps: ${stepCount}\nCalories: ${Math.round(finalCal)}`);
-            location.reload(); 
-        });
-
-        window.setMode = (mode) => {
-            gameMode = mode;
-            document.getElementById('indoorInterface').style.display = (mode === 'indoor') ? 'flex' : 'none';
-            document.getElementById('map').style.display = (mode === 'outdoor') ? 'block' : 'none';
-            document.querySelectorAll('.mode-btn').forEach(b => b.classList.toggle('active', b.innerText.toLowerCase().includes(mode)));
-        };
-
-        window.saveProfile = () => {
-            const icon = document.getElementById('profIcon').value || "👤";
-            const w = document.getElementById('profWeight').value;
-            const s = document.getElementById('profSense').value;
-            localStorage.setItem('userIcon', icon);
-            localStorage.setItem('userWeight', w);
-            localStorage.setItem('stepSense', s);
-            userWeight = parseInt(w);
-            stepThreshold = parseInt(s);
-            document.getElementById('profileModal').style.display = 'none';
-            alert("Profile Saved");
+            alert("Session Recorded!");
             location.reload();
-        };
-
-        document.getElementById('menuBtn').addEventListener('click', () => document.getElementById('sidebar').classList.toggle('open'));
-
-        onValue(ref(db, `users/${currentUser}`), (s) => {
-            const d = s.val();
-            if(d) {
-                document.getElementById('sbUser').innerText = currentUser;
-                document.getElementById('sbTotalSteps').innerText = d.totalSteps || 0;
-                document.getElementById('sbTotalCal').innerText = Math.round(d.totalCalories || 0);
-            }
         });
 
-        // Load Maps
         const script = document.createElement('script');
         script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyAzfoxuzRbmyrhGChfTEWB05xvyNRmvK3k&libraries=geometry&callback=initMap`;
         document.head.appendChild(script);
