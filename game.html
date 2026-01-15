@@ -1,53 +1,72 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Conquest Live Tracker</title>
+    <title>Conquest Unified Tracker</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <style>
         html, body { height: 100%; margin: 0; padding: 0; background: #000; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
-        #map { height: 100%; width: 100%; }
+        #map { height: 100%; width: 100%; display: block; }
         
-        /* LIVE HUD STYLES */
-        #liveHUD {
-            display: none; position: absolute; top: 70px; left: 50%; transform: translateX(-50%);
-            width: 95%; max-width: 500px; background: rgba(0, 0, 0, 0.85);
-            border: 1px solid #00e676; border-radius: 12px; z-index: 450;
-            padding: 10px; grid-template-columns: repeat(3, 1fr); gap: 10px;
-            box-shadow: 0 0 20px rgba(0, 230, 118, 0.3); font-family: 'Orbitron', sans-serif;
-        }
-        .hud-item { text-align: center; border-right: 1px solid #333; }
-        .hud-item:last-child { border-right: none; }
-        .hud-val { display: block; color: #00e676; font-size: 1.1rem; font-weight: bold; }
-        .hud-lbl { display: block; color: #888; font-size: 0.6rem; text-transform: uppercase; }
-
-        /* INDOOR INTERFACE */
+        /* INDOOR INTERFACE STYLES */
         #indoorInterface {
             display: none; height: 100%; width: 100%;
             background: radial-gradient(circle at center, #111 0%, #000 100%);
             flex-direction: column; align-items: center; justify-content: center;
             color: white; position: absolute; top: 0; left: 0; z-index: 50;
         }
-        
-        /* SIDEBAR & UI */
-        .sidebar { position: absolute; top: 0; left: 0; bottom: 0; width: 260px; background: rgba(15,15,15,0.98); border-right: 2px solid #8B0000; z-index: 400; transform: translateX(-100%); transition: 0.3s; color: white; display:flex; flex-direction:column; }
-        .sidebar.open { transform: translateX(0); }
-        .menu-toggle { position: absolute; top: 10px; left: 10px; z-index: 401; background: #8B0000; color: white; padding: 8px 12px; border-radius: 4px; cursor: pointer; border: 2px solid #ff4444; font-family: 'Cinzel', serif; }
-        
+        .metric-circle {
+            width: 220px; height: 220px; border-radius: 50%; border: 5px solid #00e676;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            margin-bottom: 30px; box-shadow: 0 0 30px rgba(0, 230, 118, 0.2);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0% { box-shadow: 0 0 10px rgba(0,230,118,0.1); } 50% { box-shadow: 0 0 30px rgba(0,230,118,0.4); } 100% { box-shadow: 0 0 10px rgba(0,230,118,0.1); } }
+        .ind-val { font-size: 2.8rem; font-weight: bold; font-family: 'Orbitron', sans-serif; color: #00e676; }
+        .ind-lbl { color: #888; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 2px; }
+
+        /* LIVE HUD (For Outdoor) */
+        #liveHUD {
+            display: none; position: absolute; top: 70px; left: 50%; transform: translateX(-50%);
+            width: 95%; max-width: 500px; background: rgba(0, 0, 0, 0.85);
+            border: 1px solid #C5A059; border-radius: 12px; z-index: 450;
+            padding: 10px; grid-template-columns: repeat(3, 1fr); gap: 10px;
+            font-family: 'Orbitron', sans-serif;
+        }
+        .hud-item { text-align: center; }
+        .hud-val { display: block; color: #00e676; font-size: 1rem; }
+        .hud-lbl { display: block; color: #888; font-size: 0.55rem; text-transform: uppercase; }
+
+        /* CONTROLS & UI */
+        .mode-switch-container { position: absolute; top: 10px; right: 10px; z-index: 401; background: rgba(0,0,0,0.8); padding: 5px; border-radius: 20px; border: 1px solid #C5A059; display: flex; }
+        .mode-btn { padding: 8px 15px; border-radius: 15px; border: none; cursor: pointer; color: #aaa; background: none; font-weight: bold; font-size: 0.75rem; }
+        .mode-btn.active { background: #C5A059; color: black; }
+
         .controls { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 400px; z-index: 300; display: flex; flex-direction: column; gap: 10px; }
-        button, .nav-btn { padding: 15px; border: none; border-radius: 12px; font-size: 1rem; font-weight: bold; cursor: pointer; font-family: 'Cinzel', serif; text-transform: uppercase; text-decoration: none; text-align: center; flex: 1; }
+        button, .nav-btn { padding: 15px; border: none; border-radius: 12px; font-size: 1rem; font-weight: bold; cursor: pointer; font-family: 'Cinzel', serif; text-transform: uppercase; text-decoration: none; text-align: center; }
         #startBtn { background: linear-gradient(180deg, #00e676, #00c853); color: #003300; }
         #stopBtn { background: linear-gradient(180deg, #ff1744, #d50000); color: white; display: none; }
-        .home-btn { background: #fff; color: #000; }
-
-        .modal { display: none; position: fixed; z-index: 999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); align-items: center; justify-content: center; }
-        .modal-content { background: #1a1a1a; padding: 25px; border: 2px solid #C5A059; border-radius: 8px; width: 85%; max-width: 350px; color: white; }
     </style>
 </head>
 <body>
 
-    <div class="menu-toggle" id="menuBtn">☰ STATS</div>
+    <div class="mode-switch-container">
+        <button class="mode-btn active" id="btnOut" onclick="window.setMode('outdoor')">🏹 OUTDOOR</button>
+        <button class="mode-btn" id="btnIn" onclick="window.setMode('indoor')">🏃 INDOOR</button>
+    </div>
+
+    <div id="indoorInterface">
+        <h2 style="color:#C5A059; font-family:'Cinzel', serif; letter-spacing:4px;">TRAINING</h2>
+        <div class="metric-circle">
+            <div class="ind-val" id="indDist">0</div>
+            <div class="ind-lbl">METERS</div>
+        </div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; width:80%;">
+            <div style="text-align:center;"><span class="ind-val" id="indSteps" style="font-size:1.5rem;">0</span><br><span class="ind-lbl">Steps</span></div>
+            <div style="text-align:center;"><span class="ind-val" id="indCal" style="font-size:1.5rem;">0</span><br><span class="ind-lbl">Kcal</span></div>
+        </div>
+    </div>
 
     <div id="liveHUD">
         <div class="hud-item"><span class="hud-val" id="hudTime">00:00</span><span class="hud-lbl">Time</span></div>
@@ -61,23 +80,21 @@
     <div id="map"></div>
 
     <div class="controls">
-        <button id="startBtn">⚔️ Start Conquest</button>
-        <button id="stopBtn">🚩 Claim Territory</button>
-        <div id="conquestNav" style="display: flex; gap: 10px; width: 100%;">
-            <a href="dashboard.html" class="nav-btn home-btn">🏰 HOME</a>
-        </div>
+        <button id="startBtn">⚔️ Start Session</button>
+        <button id="stopBtn">🚩 Stop & Save</button>
+        <a href="dashboard.html" id="homeBtn" style="background:#fff; color:#000; padding:12px; border-radius:12px; text-decoration:none; text-align:center; font-family:'Cinzel'; font-weight:bold;">🏠 HOME</a>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-        import { getDatabase, ref, update, onValue, get } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+        import { getDatabase, ref, update, get } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
         const firebaseConfig = { databaseURL: "https://runmate-cb328-default-rtdb.firebaseio.com/" };
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        let map, userMarker, activePolyline, watchId, timerInterval;
-        let isTracking = false, startTime, totalMeters = 0;
+        let map, userMarker, activePolyline, watchId;
+        let isTracking = false, gameMode = 'outdoor', startTime, totalMeters = 0;
         let stepCount = 0, lastAccelZ = 0, lastPos = null;
         
         const currentUser = localStorage.getItem('currentUser');
@@ -108,42 +125,62 @@
             } else { userMarker.setPosition(pos); }
         }
 
+        window.setMode = (mode) => {
+            if(isTracking) return alert("Stop session first!");
+            gameMode = mode;
+            document.getElementById('indoorInterface').style.display = (mode === 'indoor') ? 'flex' : 'none';
+            document.getElementById('map').style.display = (mode === 'outdoor') ? 'block' : 'none';
+            document.getElementById('btnOut').classList.toggle('active', mode === 'outdoor');
+            document.getElementById('btnIn').classList.toggle('active', mode === 'indoor');
+        };
+
         function handleMotion(event) {
             if (!isTracking) return;
             const acc = event.accelerationIncludingGravity;
+            if(!acc) return;
             let delta = Math.abs(acc.z - lastAccelZ);
-            if (delta > stepThreshold) { stepCount++; }
+            if (delta > stepThreshold) { stepCount++; updateDisplayOnly(); }
             lastAccelZ = acc.z;
         }
 
-        function updateLiveStats(currentPos) {
+        function updateDisplayOnly() {
+             if(gameMode === 'indoor') {
+                 document.getElementById('indSteps').innerText = stepCount;
+                 document.getElementById('indDist').innerText = Math.round(totalMeters);
+                 const cal = (totalMeters / 1000) * userWeight * 1.03;
+                 document.getElementById('indCal').innerText = Math.round(cal);
+             }
+        }
+
+        function updateLiveHUD(currentPos) {
             if (lastPos) {
                 const d = google.maps.geometry.spherical.computeDistanceBetween(
                     new google.maps.LatLng(lastPos), new google.maps.LatLng(currentPos)
                 );
-                if (d > 1) totalMeters += d;
+                // Filtering GPS jumps
+                if (d > 1 && d < 30) totalMeters += d;
             }
             lastPos = currentPos;
 
             const elapsedSec = Math.floor((Date.now() - startTime) / 1000);
             const km = totalMeters / 1000;
-            
-            // Live Calculations
             const speed = (km / (elapsedSec / 3600)) || 0;
             const paceMin = (elapsedSec / 60) / km;
             const calories = km * userWeight * 1.03;
 
-            // Update UI
-            document.getElementById('hudTime').innerText = new Date(elapsedSec * 1000).toISOString().substr(14, 5);
-            document.getElementById('hudDist').innerText = totalMeters > 1000 ? km.toFixed(2) + 'km' : Math.round(totalMeters) + 'm';
-            document.getElementById('hudSteps').innerText = stepCount;
-            document.getElementById('hudSpeed').innerText = speed.toFixed(1);
-            document.getElementById('hudCal').innerText = Math.round(calories);
-
-            if (km > 0.01) {
-                const pMin = Math.floor(paceMin);
-                const pSec = Math.floor((paceMin - pMin) * 60);
-                document.getElementById('hudPace').innerText = `${pMin}'${pSec.toString().padStart(2, '0')}"`;
+            if(gameMode === 'outdoor') {
+                document.getElementById('hudTime').innerText = new Date(elapsedSec * 1000).toISOString().substr(14, 5);
+                document.getElementById('hudDist').innerText = totalMeters > 1000 ? km.toFixed(2) + 'km' : Math.round(totalMeters) + 'm';
+                document.getElementById('hudSteps').innerText = stepCount;
+                document.getElementById('hudSpeed').innerText = speed.toFixed(1);
+                document.getElementById('hudCal').innerText = Math.round(calories);
+                if (km > 0.01) {
+                    const pMin = Math.floor(paceMin);
+                    const pSec = Math.floor((paceMin - pMin) * 60);
+                    document.getElementById('hudPace').innerText = `${pMin}'${pSec.toString().padStart(2, '0')}"`;
+                }
+            } else {
+                updateDisplayOnly();
             }
         }
 
@@ -154,18 +191,20 @@
             startTime = Date.now();
             totalMeters = 0; stepCount = 0; lastPos = null;
             
-            document.getElementById('liveHUD').style.display = 'grid';
             document.getElementById('startBtn').style.display = 'none';
-            document.getElementById('conquestNav').style.display = 'none';
+            document.getElementById('homeBtn').style.display = 'none';
             document.getElementById('stopBtn').style.display = 'block';
+            if(gameMode === 'outdoor') document.getElementById('liveHUD').style.display = 'grid';
 
             window.addEventListener('devicemotion', handleMotion);
             
             watchId = navigator.geolocation.watchPosition(pos => {
                 const pt = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                updateLiveStats(pt);
-                updateUserMarker(pt);
-                map.panTo(pt);
+                updateLiveHUD(pt);
+                if(gameMode === 'outdoor') {
+                    updateUserMarker(pt);
+                    map.panTo(pt);
+                }
             }, null, { enableHighAccuracy: true });
         });
 
@@ -183,14 +222,13 @@
                 totalCalories: (userData.totalCalories || 0) + finalCal
             });
 
-            alert("Session Recorded!");
+            alert(`Session Complete!\nDistance: ${Math.round(totalMeters)}m\nSteps: ${stepCount}`);
             location.reload();
         });
 
         const script = document.createElement('script');
         script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyAzfoxuzRbmyrhGChfTEWB05xvyNRmvK3k&libraries=geometry&callback=initMap`;
         document.head.appendChild(script);
-
     </script>
 </body>
 </html>
