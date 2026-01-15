@@ -6,7 +6,8 @@
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        html, body { height: 100%; margin: 0; padding: 0; background: #000; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+        /* Bug Fix: Added generic font-family fallbacks to all declarations */
+        html, body { height: 100%; margin: 0; padding: 0; background: #000; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; }
         #map { height: 100%; width: 100%; display: block; }
         
         /* INDOOR INTERFACE STYLES */
@@ -23,6 +24,8 @@
             animation: pulse 2s infinite;
         }
         @keyframes pulse { 0% { box-shadow: 0 0 10px rgba(0,230,118,0.1); } 50% { box-shadow: 0 0 30px rgba(0,230,118,0.4); } 100% { box-shadow: 0 0 10px rgba(0,230,118,0.1); } }
+        
+        /* Bug Fix: Ensuring 'sans-serif' fallback for Orbitron */
         .ind-val { font-size: 2.8rem; font-weight: bold; font-family: 'Orbitron', sans-serif; color: #00e676; }
         .ind-lbl { color: #888; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 2px; }
 
@@ -44,9 +47,13 @@
         .mode-btn.active { background: #C5A059; color: black; }
 
         .controls { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 400px; z-index: 300; display: flex; flex-direction: column; gap: 10px; }
+        
+        /* Bug Fix: Ensuring 'serif' fallback for Cinzel */
         button, .nav-btn { padding: 15px; border: none; border-radius: 12px; font-size: 1rem; font-weight: bold; cursor: pointer; font-family: 'Cinzel', serif; text-transform: uppercase; text-decoration: none; text-align: center; }
         #startBtn { background: linear-gradient(180deg, #00e676, #00c853); color: #003300; }
         #stopBtn { background: linear-gradient(180deg, #ff1744, #d50000); color: white; display: none; }
+        
+        #homeBtn { background: #fff; color: #000; padding: 12px; border-radius: 12px; text-decoration: none; text-align: center; font-family: 'Cinzel', serif; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -82,18 +89,19 @@
     <div class="controls">
         <button id="startBtn">⚔️ Start Session</button>
         <button id="stopBtn">🚩 Stop & Save</button>
-        <a href="dashboard.html" id="homeBtn" style="background:#fff; color:#000; padding:12px; border-radius:12px; text-decoration:none; text-align:center; font-family:'Cinzel'; font-weight:bold;">🏠 HOME</a>
+        <a href="dashboard.html" id="homeBtn">🏠 HOME</a>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
         import { getDatabase, ref, update, get } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
+        // Configuration
         const firebaseConfig = { databaseURL: "https://runmate-cb328-default-rtdb.firebaseio.com/" };
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        let map, userMarker, activePolyline, watchId;
+        let map, userMarker, watchId;
         let isTracking = false, gameMode = 'outdoor', startTime, totalMeters = 0;
         let stepCount = 0, lastAccelZ = 0, lastPos = null;
         
@@ -101,6 +109,7 @@
         let userWeight = parseInt(localStorage.getItem('userWeight')) || 75;
         let stepThreshold = parseInt(localStorage.getItem('stepSense')) || 15;
 
+        // Initialize Map
         window.initMap = function() {
             map = new google.maps.Map(document.getElementById("map"), {
                 zoom: 19, center: { lat: 0, lng: 0 }, mapTypeId: 'terrain', disableDefaultUI: true,
@@ -134,6 +143,7 @@
             document.getElementById('btnIn').classList.toggle('active', mode === 'indoor');
         };
 
+        // Step Counting
         function handleMotion(event) {
             if (!isTracking) return;
             const acc = event.accelerationIncludingGravity;
@@ -157,7 +167,6 @@
                 const d = google.maps.geometry.spherical.computeDistanceBetween(
                     new google.maps.LatLng(lastPos), new google.maps.LatLng(currentPos)
                 );
-                // Filtering GPS jumps
                 if (d > 1 && d < 30) totalMeters += d;
             }
             lastPos = currentPos;
@@ -222,7 +231,7 @@
                 totalCalories: (userData.totalCalories || 0) + finalCal
             });
 
-            alert(`Session Complete!\nDistance: ${Math.round(totalMeters)}m\nSteps: ${stepCount}`);
+            alert(`Victory! Distance: ${Math.round(totalMeters)}m | Steps: ${stepCount}`);
             location.reload();
         });
 
